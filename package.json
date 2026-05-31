@@ -1,6 +1,6 @@
 {
 	"name": "@tasknotes/model",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "TaskNotes model, mapping, validation, recurrence, and operation-planning reference implementation.",
 	"license": "MIT",
 	"type": "module",

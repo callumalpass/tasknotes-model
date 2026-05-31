@@ -1,4 +1,4 @@
-export const TASKNOTES_SPEC_VERSION = "0.1.0-draft";
+export const TASKNOTES_SPEC_VERSION = "0.2.0";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
@@ -8,6 +8,8 @@ export interface JsonObject {
 }
 
 export type RecurrenceAnchor = "scheduled" | "completion";
+export type OccurrenceMaterializationMode = "manual" | "on_completion" | "rolling";
+export type OccurrenceNextTrigger = "completion" | "completion_or_skip";
 
 export type TaskDependencyRelType =
 	| "FINISHTOSTART"
@@ -53,6 +55,13 @@ export interface TaskInfo {
 	recurrence_anchor?: RecurrenceAnchor;
 	complete_instances?: string[];
 	skipped_instances?: string[];
+	recurrence_parent?: string;
+	occurrence_date?: string;
+	occurrence_materialization?: OccurrenceMaterializationMode;
+	occurrence_next_trigger?: OccurrenceNextTrigger;
+	occurrence_template?: string;
+	occurrence_past_horizon?: string;
+	occurrence_future_horizon?: string;
 	completedDate?: string;
 	timeEstimate?: number;
 	timeEntries?: TimeEntry[];
@@ -108,6 +117,13 @@ export interface FieldMapping {
 	dateModified: string;
 	recurrence: string;
 	recurrenceAnchor: string;
+	recurrenceParent: string;
+	occurrenceDate: string;
+	occurrenceMaterialization: string;
+	occurrenceNextTrigger: string;
+	occurrenceTemplate: string;
+	occurrencePastHorizon: string;
+	occurrenceFutureHorizon: string;
 	archiveTag: string;
 	timeEntries: string;
 	completeInstances: string;
@@ -134,6 +150,7 @@ export interface StatusConfig {
 	color: string;
 	icon?: string;
 	isCompleted: boolean;
+	isSkipped?: boolean;
 	excludeFromCycle?: boolean;
 	nextStatus?: string;
 	order: number;
@@ -187,6 +204,13 @@ export interface RecurrenceConfig {
 	resetCheckboxesOnRecurrence: boolean;
 }
 
+export interface OccurrenceConfig {
+	defaultMaterialization: OccurrenceMaterializationMode;
+	defaultNextTrigger: OccurrenceNextTrigger;
+	pastHorizon?: string;
+	futureHorizon?: string;
+}
+
 export interface TaskNotesModelConfig {
 	fieldMapping: FieldMapping;
 	statuses: StatusConfig[];
@@ -196,6 +220,7 @@ export interface TaskNotesModelConfig {
 	storeTitleInFilename: boolean;
 	userFields: UserMappedField[];
 	recurrence: RecurrenceConfig;
+	occurrences: OccurrenceConfig;
 	timeTracking: TimeTrackingConfig;
 }
 
@@ -251,6 +276,13 @@ export type FieldRole =
 	| "recurrenceAnchor"
 	| "completeInstances"
 	| "skippedInstances"
+	| "recurrenceParent"
+	| "occurrenceDate"
+	| "occurrenceMaterialization"
+	| "occurrenceNextTrigger"
+	| "occurrenceTemplate"
+	| "occurrencePastHorizon"
+	| "occurrenceFutureHorizon"
 	| "timeEntries"
 	| "blockedBy"
 	| "reminders";

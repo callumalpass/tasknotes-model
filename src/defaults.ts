@@ -19,6 +19,13 @@ export const DEFAULT_FIELD_MAPPING: FieldMapping = {
 	dateModified: "dateModified",
 	recurrence: "recurrence",
 	recurrenceAnchor: "recurrence_anchor",
+	recurrenceParent: "recurrence_parent",
+	occurrenceDate: "occurrence_date",
+	occurrenceMaterialization: "occurrence_materialization",
+	occurrenceNextTrigger: "occurrence_next_trigger",
+	occurrenceTemplate: "occurrence_template",
+	occurrencePastHorizon: "occurrence_past_horizon",
+	occurrenceFutureHorizon: "occurrence_future_horizon",
 	archiveTag: "archived",
 	timeEntries: "timeEntries",
 	completeInstances: "complete_instances",
@@ -134,6 +141,12 @@ export const DEFAULT_MODEL_CONFIG: TaskNotesModelConfig = {
 		maintainDueDateOffset: true,
 		resetCheckboxesOnRecurrence: false,
 	},
+	occurrences: {
+		defaultMaterialization: "manual",
+		defaultNextTrigger: "completion",
+		pastHorizon: "P0D",
+		futureHorizon: "P14D",
+	},
 	timeTracking: {
 		autoStopOnComplete: false,
 		autoStopNotification: true,
@@ -151,6 +164,7 @@ export function cloneDefaultModelConfig(): TaskNotesModelConfig {
 		taskIdentification: { ...DEFAULT_MODEL_CONFIG.taskIdentification },
 		userFields: DEFAULT_MODEL_CONFIG.userFields.map((field) => ({ ...field })),
 		recurrence: { ...DEFAULT_MODEL_CONFIG.recurrence },
+		occurrences: { ...DEFAULT_MODEL_CONFIG.occurrences },
 		timeTracking: { ...DEFAULT_MODEL_CONFIG.timeTracking },
 	};
 }

@@ -25,6 +25,13 @@ export const ALL_FIELD_ROLES: FieldRole[] = [
 	"recurrenceAnchor",
 	"completeInstances",
 	"skippedInstances",
+	"recurrenceParent",
+	"occurrenceDate",
+	"occurrenceMaterialization",
+	"occurrenceNextTrigger",
+	"occurrenceTemplate",
+	"occurrencePastHorizon",
+	"occurrenceFutureHorizon",
 	"timeEntries",
 	"blockedBy",
 	"reminders",
@@ -44,6 +51,7 @@ export function resolveModelConfig(input: Partial<TaskNotesModelConfig> = {}): T
 		},
 		userFields: input.userFields ? input.userFields.map((field) => ({ ...field })) : [],
 		recurrence: { ...DEFAULT_MODEL_CONFIG.recurrence, ...input.recurrence },
+		occurrences: { ...DEFAULT_MODEL_CONFIG.occurrences, ...input.occurrences },
 		timeTracking: { ...DEFAULT_MODEL_CONFIG.timeTracking, ...input.timeTracking },
 	};
 }
@@ -60,6 +68,20 @@ export function getDefaultCompletedStatus(
 	statuses: readonly StatusConfig[] = DEFAULT_MODEL_CONFIG.statuses
 ): string {
 	return statuses.find((entry) => entry.isCompleted)?.value || "done";
+}
+
+export function isSkippedStatus(
+	status: string | undefined,
+	statuses: readonly StatusConfig[] = DEFAULT_MODEL_CONFIG.statuses
+): boolean {
+	if (!status) return false;
+	return statuses.some((entry) => entry.value === status && entry.isSkipped === true);
+}
+
+export function getDefaultSkippedStatus(
+	statuses: readonly StatusConfig[] = DEFAULT_MODEL_CONFIG.statuses
+): string | undefined {
+	return statuses.find((entry) => entry.isSkipped === true)?.value;
 }
 
 export function getStatusConfig(
@@ -272,7 +294,14 @@ export function mapTasknotesPluginConfig(source: Record<string, unknown>): Recor
 		const completedValues = source.customStatuses
 			.filter((entry) => isRecord(entry) && entry.isCompleted === true && typeof entry.value === "string")
 			.map((entry) => String((entry as Record<string, unknown>).value));
-		out.status = { values, completed_values: completedValues };
+		const skippedValues = source.customStatuses
+			.filter((entry) => isRecord(entry) && entry.isSkipped === true && typeof entry.value === "string")
+			.map((entry) => String((entry as Record<string, unknown>).value));
+		out.status = {
+			values,
+			completed_values: completedValues,
+			...(skippedValues.length > 0 ? { skipped_values: skippedValues } : {}),
+		};
 	}
 
 	if (typeof source.taskIdentificationMethod === "string") {
@@ -290,6 +319,28 @@ export function mapTasknotesPluginConfig(source: Record<string, unknown>): Recor
 
 	if (typeof source.autoStopTimeTrackingOnComplete === "boolean") {
 		out.time_tracking = { auto_stop_on_complete: source.autoStopTimeTrackingOnComplete };
+	}
+
+	if (
+		typeof source.defaultOccurrenceMaterialization === "string" ||
+		typeof source.defaultOccurrenceNextTrigger === "string" ||
+		typeof source.occurrencePastHorizon === "string" ||
+		typeof source.occurrenceFutureHorizon === "string"
+	) {
+		out.occurrences = {
+			...(typeof source.defaultOccurrenceMaterialization === "string"
+				? { default_materialization: source.defaultOccurrenceMaterialization }
+				: {}),
+			...(typeof source.defaultOccurrenceNextTrigger === "string"
+				? { default_next_trigger: source.defaultOccurrenceNextTrigger }
+				: {}),
+			...(typeof source.occurrencePastHorizon === "string"
+				? { past_horizon: source.occurrencePastHorizon }
+				: {}),
+			...(typeof source.occurrenceFutureHorizon === "string"
+				? { future_horizon: source.occurrenceFutureHorizon }
+				: {}),
+		};
 	}
 
 	return out;
@@ -366,6 +417,13 @@ function mapPluginRoleToSpecRole(roleKey: string): string {
 		recurrenceAnchor: "recurrence_anchor",
 		completeInstances: "complete_instances",
 		skippedInstances: "skipped_instances",
+		recurrenceParent: "recurrence_parent",
+		occurrenceDate: "occurrence_date",
+		occurrenceMaterialization: "occurrence_materialization",
+		occurrenceNextTrigger: "occurrence_next_trigger",
+		occurrenceTemplate: "occurrence_template",
+		occurrencePastHorizon: "occurrence_past_horizon",
+		occurrenceFutureHorizon: "occurrence_future_horizon",
 		timeEntries: "time_entries",
 		timeEstimate: "time_estimate",
 		blockedBy: "blocked_by",

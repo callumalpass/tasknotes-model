@@ -157,6 +157,33 @@ export function mapTaskFromFrontmatter(
 		const value = frontmatter[mapping.skippedInstances];
 		mapped.skipped_instances = validateCompleteInstances(Array.isArray(value) ? value : [value]);
 	}
+	if (frontmatter[mapping.recurrenceParent] !== undefined) {
+		mapped.recurrence_parent = normalizeStringValue(frontmatter[mapping.recurrenceParent]);
+	}
+	if (frontmatter[mapping.occurrenceDate] !== undefined) {
+		mapped.occurrence_date = normalizeStringValue(frontmatter[mapping.occurrenceDate]);
+	}
+	if (frontmatter[mapping.occurrenceMaterialization] !== undefined) {
+		const value = normalizeStringValue(frontmatter[mapping.occurrenceMaterialization]);
+		if (value === "manual" || value === "on_completion" || value === "rolling") {
+			mapped.occurrence_materialization = value;
+		}
+	}
+	if (frontmatter[mapping.occurrenceNextTrigger] !== undefined) {
+		const value = normalizeStringValue(frontmatter[mapping.occurrenceNextTrigger]);
+		if (value === "completion" || value === "completion_or_skip") {
+			mapped.occurrence_next_trigger = value;
+		}
+	}
+	if (frontmatter[mapping.occurrenceTemplate] !== undefined) {
+		mapped.occurrence_template = normalizeStringValue(frontmatter[mapping.occurrenceTemplate]);
+	}
+	if (frontmatter[mapping.occurrencePastHorizon] !== undefined) {
+		mapped.occurrence_past_horizon = normalizeStringValue(frontmatter[mapping.occurrencePastHorizon]);
+	}
+	if (frontmatter[mapping.occurrenceFutureHorizon] !== undefined) {
+		mapped.occurrence_future_horizon = normalizeStringValue(frontmatter[mapping.occurrenceFutureHorizon]);
+	}
 	if (mapping.blockedBy && frontmatter[mapping.blockedBy] !== undefined) {
 		mapped.blockedBy = normalizeDependencyList(frontmatter[mapping.blockedBy]);
 	}
@@ -238,6 +265,21 @@ export function mapTaskToFrontmatter(
 	if (taskData.completedDate !== undefined) frontmatter[mapping.completedDate] = taskData.completedDate;
 	if (taskData.recurrence !== undefined) frontmatter[mapping.recurrence] = taskData.recurrence;
 	if (taskData.recurrence_anchor !== undefined) frontmatter[mapping.recurrenceAnchor] = taskData.recurrence_anchor;
+	if (taskData.recurrence_parent !== undefined) frontmatter[mapping.recurrenceParent] = taskData.recurrence_parent;
+	if (taskData.occurrence_date !== undefined) frontmatter[mapping.occurrenceDate] = taskData.occurrence_date;
+	if (taskData.occurrence_materialization !== undefined) {
+		frontmatter[mapping.occurrenceMaterialization] = taskData.occurrence_materialization;
+	}
+	if (taskData.occurrence_next_trigger !== undefined) {
+		frontmatter[mapping.occurrenceNextTrigger] = taskData.occurrence_next_trigger;
+	}
+	if (taskData.occurrence_template !== undefined) frontmatter[mapping.occurrenceTemplate] = taskData.occurrence_template;
+	if (taskData.occurrence_past_horizon !== undefined) {
+		frontmatter[mapping.occurrencePastHorizon] = taskData.occurrence_past_horizon;
+	}
+	if (taskData.occurrence_future_horizon !== undefined) {
+		frontmatter[mapping.occurrenceFutureHorizon] = taskData.occurrence_future_horizon;
+	}
 	if (taskData.dateCreated !== undefined) frontmatter[mapping.dateCreated] = taskData.dateCreated;
 	if (taskData.dateModified !== undefined) frontmatter[mapping.dateModified] = taskData.dateModified;
 	if (taskData.sortOrder !== undefined) frontmatter[mapping.sortOrder] = taskData.sortOrder;

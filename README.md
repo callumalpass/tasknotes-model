@@ -13,6 +13,7 @@ It intentionally contains no Obsidian API usage, no vault IO, no process exits, 
 - TaskNotes frontmatter mapping and normalization
 - date parsing, date comparison, and storage-date semantics
 - recurrence evaluation and schedule advancement
+- materialized occurrence identity, creation, completion, skip, and parent reconciliation plans
 - time tracking entry planning and duration calculation
 - validation helpers
 - host-independent operation plans for common task mutations
@@ -44,7 +45,7 @@ The package exports both the root module and focused subpath modules:
 | `@tasknotes/model/recurrence` | Recurrence evaluation, DTSTART handling, and schedule recalculation |
 | `@tasknotes/model/time` | Time-entry sanitizing, timer plans, and duration totals |
 | `@tasknotes/model/validation` | Task and time-entry validation |
-| `@tasknotes/model/operations` | Host-independent task mutation planning |
+| `@tasknotes/model/operations` | Host-independent task mutation planning, including materialized occurrence plans |
 | `@tasknotes/model/frontmatter` | Markdown task document parse/serialize helpers |
 | `@tasknotes/model/conformance` | tasknotes-spec conformance operation dispatcher |
 
@@ -110,6 +111,47 @@ const plan = buildSpecCompleteTaskUpdate({
 // before writing to a file, database, or collection.
 ```
 
+Materialize and reconcile a recurring occurrence:
+
+```ts
+import {
+	buildMaterializeOccurrencePlan,
+	buildMaterializedOccurrenceCompletePlan,
+} from "@tasknotes/model/operations";
+
+const materialized = buildMaterializeOccurrencePlan({
+	parentTask: {
+		title: "Weekly review",
+		status: "open",
+		priority: "normal",
+		path: "Tasks/Weekly review.md",
+		archived: false,
+		recurrence: "DTSTART:20260601;FREQ=WEEKLY;BYDAY=MO",
+		occurrence_materialization: "on_completion",
+	},
+	targetDate: "2026-06-01",
+	currentTimestamp: "2026-05-31T12:00:00Z",
+});
+
+// Host creates materialized.occurrenceTask if materialized.created is true.
+
+const complete = buildMaterializedOccurrenceCompletePlan({
+	occurrenceTask: {
+		...materialized.occurrenceTask,
+		path: "Tasks/Weekly review 2026-06-01.md",
+		archived: false,
+	},
+	parentTask: materialized.parentTask,
+	completedStatus: "done",
+	currentTimestamp: "2026-06-01T17:00:00Z",
+	maintainDueDateOffsetInRecurring: true,
+});
+
+// Host applies complete.occurrenceUpdates to the occurrence note and
+// complete.parentUpdates to the recurring parent. If complete.materializeNextDate
+// is present, the host can call buildMaterializeOccurrencePlan again for that date.
+```
+
 Start and stop time tracking:
 
 ```ts
@@ -133,13 +175,13 @@ if (active) {
 
 ## Development
 
-From the TaskNotes repository root:
+From this package repository:
 
 ```bash
-npm run build:model
-npm run test:model
+npm run build
+npm test
 ```
 
-The package build emits ESM, CommonJS, and TypeScript declaration output under `packages/model/dist`. The repository ignores that generated directory; release tooling should build it before packing or publishing.
+The package build emits ESM, CommonJS, and TypeScript declaration output under `dist`. Release tooling should build it before packing or publishing.
 
-The Obsidian plugin keeps small wrappers in `src/core` so existing plugin imports stay stable while the deterministic logic lives here. Runtime-only behavior, such as Obsidian vault writes or plugin-specific clock hooks, belongs in those host wrappers.
+The Obsidian plugin uses this package through its service layer and keeps runtime-only behavior, such as Obsidian vault writes, metadata-cache link resolution, notices, and plugin-specific clock hooks, outside the model package.

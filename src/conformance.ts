@@ -27,6 +27,13 @@ import {
 	serializeDependencies,
 } from "./mapping";
 import {
+	buildMaterializeOccurrencePlan,
+	buildMaterializedOccurrenceCompletePlan,
+	buildMaterializedOccurrenceSkipPlan,
+	buildMaterializedOccurrenceUncompletePlan,
+	buildMaterializedOccurrenceUnskipPlan,
+} from "./operations";
+import {
 	completeRecurringTask,
 	getEffectiveTaskStatus,
 	recalculateRecurringSchedule,
@@ -40,18 +47,19 @@ import {
 	replaceTimeEntries,
 } from "./time";
 import { evaluateCoreValidation, validateTask, validateTimeEntries } from "./validation";
-import type { ConformanceEnvelope, TaskInfo, TimeEntry } from "./types";
+import { TASKNOTES_SPEC_VERSION, type ConformanceEnvelope, type TaskInfo, type TimeEntry } from "./types";
 
 export const conformanceMetadata = {
 	implementation: "@tasknotes/model",
-	version: "0.1.0",
-	spec_version: "0.1.0-draft",
+	version: "0.2.0",
+	spec_version: TASKNOTES_SPEC_VERSION,
 	validation_modes: ["strict"],
-	profiles: ["core-lite", "recurrence", "extended"],
+	profiles: ["core-lite", "recurrence", "materialized-occurrences", "extended"],
 	capabilities: [
 		"date",
 		"field-mapping",
 		"recurrence",
+		"occurrence-materialization",
 		"create-compat",
 		"ops-core",
 		"claim",
@@ -155,6 +163,52 @@ export function executeConformanceOperation(
 				return ok(addRemoveInstance(asRecord(input), "skippedInstances", true));
 			case "recurrence.unskip_instance":
 				return ok(addRemoveInstance(asRecord(input), "skippedInstances", false));
+			case "occurrence.materialize":
+				return ok(buildMaterializeOccurrencePlan({
+					parentTask: normalizeTaskForConformance(input.parentTask ?? input.parent),
+					targetDate: String((input.targetDate ?? input.date) || ""),
+					currentTimestamp: String(input.now || input.currentTimestamp || new Date().toISOString()),
+					existingOccurrences: arrayValue(input.existingOccurrences ?? input.occurrences).map(normalizeTaskForConformance),
+					parentLink: stringOrUndefined(input.parentLink ?? input.parent_reference),
+					defaultStatus: stringOrUndefined(input.defaultStatus ?? input.default_status) || "open",
+					defaultPriority: stringOrUndefined(input.defaultPriority ?? input.default_priority) || "normal",
+					templateTask: asRecord(input.templateTask ?? input.template_task) as Partial<TaskInfo>,
+					overrides: asRecord(input.overrides) as Partial<TaskInfo>,
+				}));
+			case "occurrence.complete":
+				return ok(buildMaterializedOccurrenceCompletePlan({
+					occurrenceTask: normalizeTaskForConformance(input.occurrenceTask ?? input.occurrence),
+					parentTask: normalizeTaskForConformance(input.parentTask ?? input.parent),
+					completedStatus: String(input.completedStatus || input.completed_status || "done"),
+					currentTimestamp: String(input.now || input.currentTimestamp || new Date().toISOString()),
+					targetDate: stringOrUndefined(input.targetDate ?? input.date),
+					maintainDueDateOffsetInRecurring: input.maintainDueDateOffset !== false,
+				}));
+			case "occurrence.uncomplete":
+				return ok(buildMaterializedOccurrenceUncompletePlan({
+					occurrenceTask: normalizeTaskForConformance(input.occurrenceTask ?? input.occurrence),
+					parentTask: normalizeTaskForConformance(input.parentTask ?? input.parent),
+					activeStatus: String(input.activeStatus || input.active_status || "open"),
+					currentTimestamp: String(input.now || input.currentTimestamp || new Date().toISOString()),
+					targetDate: stringOrUndefined(input.targetDate ?? input.date),
+				}));
+			case "occurrence.skip":
+				return ok(buildMaterializedOccurrenceSkipPlan({
+					occurrenceTask: normalizeTaskForConformance(input.occurrenceTask ?? input.occurrence),
+					parentTask: normalizeTaskForConformance(input.parentTask ?? input.parent),
+					skippedStatus: stringOrUndefined(input.skippedStatus ?? input.skipped_status),
+					currentTimestamp: String(input.now || input.currentTimestamp || new Date().toISOString()),
+					targetDate: stringOrUndefined(input.targetDate ?? input.date),
+					maintainDueDateOffsetInRecurring: input.maintainDueDateOffset !== false,
+				}));
+			case "occurrence.unskip":
+				return ok(buildMaterializedOccurrenceUnskipPlan({
+					occurrenceTask: normalizeTaskForConformance(input.occurrenceTask ?? input.occurrence),
+					parentTask: normalizeTaskForConformance(input.parentTask ?? input.parent),
+					activeStatus: String(input.activeStatus || input.active_status || "open"),
+					currentTimestamp: String(input.now || input.currentTimestamp || new Date().toISOString()),
+					targetDate: stringOrUndefined(input.targetDate ?? input.date),
+				}));
 			case "config.map_tasknotes_plugin":
 				return ok({ value: mapTasknotesPluginConfig(asRecord(input.config ?? input)) });
 			case "config.detect_task_file":

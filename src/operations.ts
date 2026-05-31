@@ -1,9 +1,10 @@
-import { formatDateForStorage, getDatePart, parseDateToUTC } from "./date";
+import { formatDateForStorage, getDatePart, parseDateToUTC, validateDateString } from "./date";
 import { isCompletedStatus } from "./config";
 import {
 	addDTSTARTToRecurrenceRule,
 	completeRecurringTask,
 	getRecurringTaskActionDate,
+	isDueByRRule,
 	recalculateRecurringSchedule,
 	updateDTSTARTInRecurrenceRule,
 	updateToNextScheduledOccurrence,
@@ -18,17 +19,21 @@ import {
 	coerceStatusFrontmatterValue,
 	mapTaskToFrontmatter,
 	normalizeDependencyEntry,
+	parseLinkToPath,
 	serializeDependencies,
 } from "./mapping";
 import type {
 	FieldMapping,
 	FieldMappingKey,
+	OccurrenceMaterializationMode,
+	OccurrenceNextTrigger,
 	StatusConfig,
 	TaskDependency,
 	TaskInfo,
 	TaskOperationPlan,
 	TaskPatchOperation,
 	TaskUpdateInput,
+	TaskValidationIssue,
 	TimeEntry,
 	UserMappedField,
 } from "./types";
@@ -71,6 +76,85 @@ export interface RecurringTaskSkippedPlan {
 	dateStr: string;
 	newSkipped: boolean;
 	dateModified: string;
+}
+
+export interface BuildMaterializeOccurrencePlanInput {
+	parentTask: TaskInfo;
+	targetDate: string | Date;
+	currentTimestamp: string;
+	existingOccurrences?: readonly TaskInfo[];
+	parentLink?: string;
+	defaultStatus?: string;
+	defaultPriority?: string;
+	templateTask?: Partial<TaskInfo>;
+	overrides?: Partial<TaskInfo>;
+	allowNonGeneratedTarget?: boolean;
+}
+
+export interface MaterializeOccurrencePlan {
+	kind: "occurrence.materialize";
+	parentTask: TaskInfo;
+	targetDate: string;
+	parentReference: string;
+	created: boolean;
+	existingOccurrence?: TaskInfo;
+	occurrenceTask: Partial<TaskInfo>;
+	fields: Record<string, unknown>;
+	issues: TaskValidationIssue[];
+	metadata: Record<string, unknown>;
+}
+
+export interface BuildMaterializedOccurrenceCompletePlanInput {
+	occurrenceTask: TaskInfo;
+	parentTask: TaskInfo;
+	completedStatus: string;
+	currentTimestamp: string;
+	targetDate?: string | Date;
+	maintainDueDateOffsetInRecurring: boolean;
+}
+
+export interface BuildMaterializedOccurrenceUncompletePlanInput {
+	occurrenceTask: TaskInfo;
+	parentTask: TaskInfo;
+	activeStatus: string;
+	currentTimestamp: string;
+	targetDate?: string | Date;
+}
+
+export interface BuildMaterializedOccurrenceSkipPlanInput {
+	occurrenceTask: TaskInfo;
+	parentTask: TaskInfo;
+	skippedStatus?: string;
+	currentTimestamp: string;
+	targetDate?: string | Date;
+	maintainDueDateOffsetInRecurring: boolean;
+}
+
+export interface BuildMaterializedOccurrenceUnskipPlanInput {
+	occurrenceTask: TaskInfo;
+	parentTask: TaskInfo;
+	activeStatus: string;
+	currentTimestamp: string;
+	targetDate?: string | Date;
+}
+
+export interface MaterializedOccurrenceStatusPlan {
+	kind:
+		| "occurrence.complete"
+		| "occurrence.uncomplete"
+		| "occurrence.skip"
+		| "occurrence.unskip";
+	targetDate: string;
+	updatedOccurrenceTask: TaskInfo;
+	updatedParentTask: TaskInfo;
+	occurrenceUpdates: Partial<TaskInfo>;
+	parentUpdates: Partial<TaskInfo>;
+	occurrenceFields: Record<string, unknown>;
+	parentFields: Record<string, unknown>;
+	dateModified: string;
+	changed: boolean;
+	materializeNextDate?: string;
+	metadata: Record<string, unknown>;
 }
 
 export interface SpecTaskUpdatePlan {
@@ -449,6 +533,347 @@ export function recurringSkippedPlanToFrontmatterPatch(
 	return patch;
 }
 
+export function getOccurrenceMaterializationMode(
+	task: Partial<TaskInfo>,
+	defaultMode: OccurrenceMaterializationMode = "manual"
+): OccurrenceMaterializationMode {
+	return isOccurrenceMaterializationMode(task.occurrence_materialization)
+		? task.occurrence_materialization
+		: defaultMode;
+}
+
+export function getOccurrenceNextTrigger(
+	task: Partial<TaskInfo>,
+	defaultTrigger: OccurrenceNextTrigger = "completion"
+): OccurrenceNextTrigger {
+	return isOccurrenceNextTrigger(task.occurrence_next_trigger)
+		? task.occurrence_next_trigger
+		: defaultTrigger;
+}
+
+export function isMaterializedOccurrenceTask(
+	task: Partial<TaskInfo>
+): task is Partial<TaskInfo> & { recurrence_parent: string; occurrence_date: string } {
+	return typeof task.recurrence_parent === "string" && typeof task.occurrence_date === "string";
+}
+
+export function normalizeTaskReference(value: string | undefined): string {
+	if (!value) return "";
+	return parseLinkToPath(value)
+		.replace(/\\/g, "/")
+		.replace(/^\/+/, "")
+		.replace(/\.md$/i, "")
+		.trim()
+		.toLowerCase();
+}
+
+export function defaultOccurrenceParentReference(parentTask: Pick<TaskInfo, "path">): string {
+	return `[[${parentTask.path.replace(/\.md$/i, "")}]]`;
+}
+
+export function findMaterializedOccurrence(
+	occurrences: readonly TaskInfo[],
+	parentTask: Pick<TaskInfo, "path">,
+	targetDate: string,
+	parentReference = defaultOccurrenceParentReference(parentTask)
+): TaskInfo | undefined {
+	const normalizedParentPath = normalizeTaskReference(parentTask.path);
+	const normalizedParentReference = normalizeTaskReference(parentReference);
+	return occurrences.find((task) => {
+		if (task.occurrence_date !== targetDate || !task.recurrence_parent) return false;
+		const normalized = normalizeTaskReference(task.recurrence_parent);
+		return normalized === normalizedParentPath || normalized === normalizedParentReference;
+	});
+}
+
+export function buildMaterializeOccurrencePlan({
+	parentTask,
+	targetDate,
+	currentTimestamp,
+	existingOccurrences = [],
+	parentLink,
+	defaultStatus = parentTask.status,
+	defaultPriority = parentTask.priority,
+	templateTask = {},
+	overrides = {},
+	allowNonGeneratedTarget = true,
+}: BuildMaterializeOccurrencePlanInput): MaterializeOccurrencePlan {
+	if (!parentTask.recurrence) throw new Error("occurrence_parent_not_recurring");
+	const dateStr = normalizeOccurrenceTargetDate(targetDate);
+	const parentReference = parentLink || defaultOccurrenceParentReference(parentTask);
+	const existingOccurrence = findMaterializedOccurrence(existingOccurrences, parentTask, dateStr, parentReference);
+	const issues: TaskValidationIssue[] = [];
+
+	if (!isDueByRecurrenceRule(parentTask, dateStr)) {
+		issues.push({
+			code: "materialization_target_not_generated",
+			message: `Target date "${dateStr}" is not generated by the parent recurrence rule.`,
+			severity: allowNonGeneratedTarget ? "warning" : "error",
+			field: "occurrence_date",
+		});
+	}
+
+	if (existingOccurrence) {
+		return {
+			kind: "occurrence.materialize",
+			parentTask,
+			targetDate: dateStr,
+			parentReference,
+			created: false,
+			existingOccurrence,
+			occurrenceTask: existingOccurrence,
+			fields: taskInfoToSpecFields(existingOccurrence),
+			issues,
+			metadata: { idempotent: true },
+		};
+	}
+
+	const inheritedTask = buildInheritedOccurrenceTask(parentTask, dateStr);
+	const customProperties = mergeCustomProperties(
+		inheritedTask.customProperties,
+		templateTask.customProperties,
+		overrides.customProperties
+	);
+	const occurrenceTask = removeUndefined({
+		...inheritedTask,
+		...templateTask,
+		...overrides,
+		id: undefined,
+		path: undefined,
+		archived: undefined,
+		status: overrides.status ?? templateTask.status ?? defaultStatus,
+		priority: overrides.priority ?? templateTask.priority ?? parentTask.priority ?? defaultPriority,
+		scheduled: overrides.scheduled ?? templateTask.scheduled ?? inheritedTask.scheduled ?? dateStr,
+		due: overrides.due ?? templateTask.due ?? inheritedTask.due,
+		customProperties,
+		recurrence: undefined,
+		recurrence_anchor: undefined,
+		complete_instances: undefined,
+		skipped_instances: undefined,
+		recurrence_parent: parentReference,
+		occurrence_date: dateStr,
+		occurrence_materialization: undefined,
+		occurrence_next_trigger: undefined,
+		occurrence_template: undefined,
+		occurrence_past_horizon: undefined,
+		occurrence_future_horizon: undefined,
+		completedDate: undefined,
+		timeEntries: undefined,
+		totalTrackedTime: undefined,
+		icsEventId: undefined,
+		googleCalendarEventId: undefined,
+		googleCalendarExceptionEventId: undefined,
+		googleCalendarExceptionOriginalScheduled: undefined,
+		googleCalendarMovedOriginalDates: undefined,
+		basesData: undefined,
+		blocking: undefined,
+		isBlocked: undefined,
+		isBlocking: undefined,
+		hasSubtasks: undefined,
+		dateCreated: overrides.dateCreated ?? templateTask.dateCreated ?? currentTimestamp,
+		dateModified: overrides.dateModified ?? templateTask.dateModified ?? currentTimestamp,
+	});
+
+	return {
+		kind: "occurrence.materialize",
+		parentTask,
+		targetDate: dateStr,
+		parentReference,
+		created: true,
+		occurrenceTask,
+		fields: taskInfoToSpecFields(occurrenceTask),
+		issues,
+		metadata: {
+			idempotent: false,
+			template: parentTask.occurrence_template,
+		},
+	};
+}
+
+export function buildMaterializedOccurrenceCompletePlan({
+	occurrenceTask,
+	parentTask,
+	completedStatus,
+	currentTimestamp,
+	targetDate,
+	maintainDueDateOffsetInRecurring,
+}: BuildMaterializedOccurrenceCompletePlanInput): MaterializedOccurrenceStatusPlan {
+	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
+	assertMaterializedOccurrence(occurrenceTask, dateStr);
+	if (!parentTask.recurrence) throw new Error("occurrence_parent_not_recurring");
+
+	const parentCompleteInstances = appendUnique(getStringArray(parentTask.complete_instances), dateStr);
+	const parentSkippedInstances = getStringArray(parentTask.skipped_instances).filter((date) => date !== dateStr);
+	const parentUpdates = buildRecurringParentProgressionUpdates({
+		parentTask,
+		targetDate: dateStr,
+		completeInstances: parentCompleteInstances,
+		skippedInstances: parentSkippedInstances,
+		currentTimestamp,
+		maintainDueDateOffsetInRecurring,
+		advanceCompletionAnchor: true,
+	});
+	const occurrenceUpdates: Partial<TaskInfo> = {
+		status: completedStatus,
+		completedDate: dateStr,
+		dateModified: currentTimestamp,
+	};
+	const updatedParentTask = { ...parentTask, ...parentUpdates };
+	const updatedOccurrenceTask = { ...occurrenceTask, ...occurrenceUpdates };
+	const materializeNextDate =
+		getOccurrenceMaterializationMode(parentTask) === "on_completion"
+			? getDatePart(updatedParentTask.scheduled || "")
+			: undefined;
+
+	return buildMaterializedOccurrenceStatusPlan({
+		kind: "occurrence.complete",
+		targetDate: dateStr,
+		occurrenceTask,
+		parentTask,
+		updatedOccurrenceTask,
+		updatedParentTask,
+		occurrenceUpdates,
+		parentUpdates,
+		currentTimestamp,
+		materializeNextDate,
+		metadata: { trigger: "completion" },
+	});
+}
+
+export function buildMaterializedOccurrenceUncompletePlan({
+	occurrenceTask,
+	parentTask,
+	activeStatus,
+	currentTimestamp,
+	targetDate,
+}: BuildMaterializedOccurrenceUncompletePlanInput): MaterializedOccurrenceStatusPlan {
+	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
+	assertMaterializedOccurrence(occurrenceTask, dateStr);
+	const parentUpdates: Partial<TaskInfo> = {
+		complete_instances: getStringArray(parentTask.complete_instances).filter((date) => date !== dateStr),
+		dateModified: currentTimestamp,
+	};
+	const occurrenceUpdates: Partial<TaskInfo> = {
+		status: activeStatus,
+		completedDate: undefined,
+		dateModified: currentTimestamp,
+	};
+	return buildMaterializedOccurrenceStatusPlan({
+		kind: "occurrence.uncomplete",
+		targetDate: dateStr,
+		occurrenceTask,
+		parentTask,
+		updatedOccurrenceTask: { ...occurrenceTask, ...occurrenceUpdates },
+		updatedParentTask: { ...parentTask, ...parentUpdates },
+		occurrenceUpdates,
+		parentUpdates,
+		currentTimestamp,
+		metadata: { trigger: "uncomplete" },
+	});
+}
+
+export function buildMaterializedOccurrenceSkipPlan({
+	occurrenceTask,
+	parentTask,
+	skippedStatus,
+	currentTimestamp,
+	targetDate,
+	maintainDueDateOffsetInRecurring,
+}: BuildMaterializedOccurrenceSkipPlanInput): MaterializedOccurrenceStatusPlan {
+	if (!skippedStatus) throw new Error("missing_skipped_status");
+	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
+	assertMaterializedOccurrence(occurrenceTask, dateStr);
+	if (!parentTask.recurrence) throw new Error("occurrence_parent_not_recurring");
+
+	const parentSkippedInstances = appendUnique(getStringArray(parentTask.skipped_instances), dateStr);
+	const parentCompleteInstances = getStringArray(parentTask.complete_instances).filter((date) => date !== dateStr);
+	const parentUpdates = buildRecurringParentProgressionUpdates({
+		parentTask,
+		targetDate: dateStr,
+		completeInstances: parentCompleteInstances,
+		skippedInstances: parentSkippedInstances,
+		currentTimestamp,
+		maintainDueDateOffsetInRecurring,
+		advanceCompletionAnchor: false,
+	});
+	const occurrenceUpdates: Partial<TaskInfo> = {
+		status: skippedStatus,
+		completedDate: undefined,
+		dateModified: currentTimestamp,
+	};
+	const updatedParentTask = { ...parentTask, ...parentUpdates };
+	const materializeNextDate =
+		getOccurrenceMaterializationMode(parentTask) === "on_completion" &&
+		getOccurrenceNextTrigger(parentTask) === "completion_or_skip"
+			? getDatePart(updatedParentTask.scheduled || "")
+			: undefined;
+
+	return buildMaterializedOccurrenceStatusPlan({
+		kind: "occurrence.skip",
+		targetDate: dateStr,
+		occurrenceTask,
+		parentTask,
+		updatedOccurrenceTask: { ...occurrenceTask, ...occurrenceUpdates },
+		updatedParentTask,
+		occurrenceUpdates,
+		parentUpdates,
+		currentTimestamp,
+		materializeNextDate,
+		metadata: { trigger: "skip" },
+	});
+}
+
+export function buildMaterializedOccurrenceUnskipPlan({
+	occurrenceTask,
+	parentTask,
+	activeStatus,
+	currentTimestamp,
+	targetDate,
+}: BuildMaterializedOccurrenceUnskipPlanInput): MaterializedOccurrenceStatusPlan {
+	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
+	assertMaterializedOccurrence(occurrenceTask, dateStr);
+	const parentUpdates: Partial<TaskInfo> = {
+		skipped_instances: getStringArray(parentTask.skipped_instances).filter((date) => date !== dateStr),
+		dateModified: currentTimestamp,
+	};
+	const occurrenceUpdates: Partial<TaskInfo> = {
+		status: activeStatus,
+		completedDate: undefined,
+		dateModified: currentTimestamp,
+	};
+	return buildMaterializedOccurrenceStatusPlan({
+		kind: "occurrence.unskip",
+		targetDate: dateStr,
+		occurrenceTask,
+		parentTask,
+		updatedOccurrenceTask: { ...occurrenceTask, ...occurrenceUpdates },
+		updatedParentTask: { ...parentTask, ...parentUpdates },
+		occurrenceUpdates,
+		parentUpdates,
+		currentTimestamp,
+		metadata: { trigger: "unskip" },
+	});
+}
+
+export function taskInfoUpdatesToFrontmatterPatch(
+	updates: Partial<TaskInfo>,
+	fieldMapping: FieldMapping
+): TaskPatchOperation[] {
+	const patch: TaskPatchOperation[] = [];
+	for (const [property, value] of Object.entries(updates) as Array<[keyof TaskInfo, unknown]>) {
+		const field = fieldNameForTaskProperty(fieldMapping, property);
+		if (!field) continue;
+		if (value === undefined || (Array.isArray(value) && value.length === 0)) {
+			patch.push({ op: "delete", field });
+		} else if (property === "status") {
+			patch.push({ op: "set", field, value: coerceStatusFrontmatterValue(String(value)) });
+		} else {
+			patch.push({ op: "set", field, value });
+		}
+	}
+	return patch;
+}
+
 export function applyFrontmatterPatch(
 	frontmatter: Record<string, unknown>,
 	patch: readonly TaskPatchOperation[]
@@ -484,6 +909,13 @@ export function specFrontmatterToTaskInfo(
 			frontmatter.recurrenceAnchor === "completion" ? "completion" : "scheduled",
 		complete_instances: getStringArray(frontmatter.completeInstances),
 		skipped_instances: getStringArray(frontmatter.skippedInstances),
+		recurrence_parent: readString(frontmatter.recurrenceParent),
+		occurrence_date: readString(frontmatter.occurrenceDate),
+		occurrence_materialization: readOccurrenceMaterializationMode(frontmatter.occurrenceMaterialization),
+		occurrence_next_trigger: readOccurrenceNextTrigger(frontmatter.occurrenceNextTrigger),
+		occurrence_template: readString(frontmatter.occurrenceTemplate),
+		occurrence_past_horizon: readString(frontmatter.occurrencePastHorizon),
+		occurrence_future_horizon: readString(frontmatter.occurrenceFutureHorizon),
 		timeEntries: sanitizeTimeEntries(frontmatter.timeEntries as TimeEntry[] | undefined),
 		tags: getStringArray(frontmatter.tags),
 		contexts: getStringArray(frontmatter.contexts),
@@ -511,6 +943,13 @@ export function taskInfoToSpecFields(task: Partial<TaskInfo>): Record<string, un
 	writeIfDefined(fields, "recurrenceAnchor", task.recurrence_anchor);
 	writeIfDefined(fields, "completeInstances", task.complete_instances);
 	writeIfDefined(fields, "skippedInstances", task.skipped_instances);
+	writeIfDefined(fields, "recurrenceParent", task.recurrence_parent);
+	writeIfDefined(fields, "occurrenceDate", task.occurrence_date);
+	writeIfDefined(fields, "occurrenceMaterialization", task.occurrence_materialization);
+	writeIfDefined(fields, "occurrenceNextTrigger", task.occurrence_next_trigger);
+	writeIfDefined(fields, "occurrenceTemplate", task.occurrence_template);
+	writeIfDefined(fields, "occurrencePastHorizon", task.occurrence_past_horizon);
+	writeIfDefined(fields, "occurrenceFutureHorizon", task.occurrence_future_horizon);
 	writeIfDefined(fields, "timeEntries", task.timeEntries);
 	writeIfDefined(fields, "tags", task.tags);
 	writeIfDefined(fields, "contexts", task.contexts);
@@ -746,6 +1185,27 @@ function applySpecFieldsToTaskInfo(task: TaskInfo, fields: Record<string, unknow
 	if (Object.prototype.hasOwnProperty.call(fields, "skippedInstances")) {
 		updatedTask.skipped_instances = getStringArray(fields.skippedInstances);
 	}
+	if (Object.prototype.hasOwnProperty.call(fields, "recurrenceParent")) {
+		updatedTask.recurrence_parent = readString(fields.recurrenceParent);
+	}
+	if (Object.prototype.hasOwnProperty.call(fields, "occurrenceDate")) {
+		updatedTask.occurrence_date = readString(fields.occurrenceDate);
+	}
+	if (Object.prototype.hasOwnProperty.call(fields, "occurrenceMaterialization")) {
+		updatedTask.occurrence_materialization = readOccurrenceMaterializationMode(fields.occurrenceMaterialization);
+	}
+	if (Object.prototype.hasOwnProperty.call(fields, "occurrenceNextTrigger")) {
+		updatedTask.occurrence_next_trigger = readOccurrenceNextTrigger(fields.occurrenceNextTrigger);
+	}
+	if (Object.prototype.hasOwnProperty.call(fields, "occurrenceTemplate")) {
+		updatedTask.occurrence_template = readString(fields.occurrenceTemplate);
+	}
+	if (Object.prototype.hasOwnProperty.call(fields, "occurrencePastHorizon")) {
+		updatedTask.occurrence_past_horizon = readString(fields.occurrencePastHorizon);
+	}
+	if (Object.prototype.hasOwnProperty.call(fields, "occurrenceFutureHorizon")) {
+		updatedTask.occurrence_future_horizon = readString(fields.occurrenceFutureHorizon);
+	}
 	if (Object.prototype.hasOwnProperty.call(fields, "timeEntries")) {
 		updatedTask.timeEntries = sanitizeTimeEntries(fields.timeEntries as TimeEntry[] | undefined);
 	}
@@ -764,6 +1224,13 @@ function addUnsetMappedFieldDeletes(
 		["timeEstimate", "timeEstimate"],
 		["completedDate", "completedDate"],
 		["recurrence", "recurrence"],
+		["recurrence_parent", "recurrenceParent"],
+		["occurrence_date", "occurrenceDate"],
+		["occurrence_materialization", "occurrenceMaterialization"],
+		["occurrence_next_trigger", "occurrenceNextTrigger"],
+		["occurrence_template", "occurrenceTemplate"],
+		["occurrence_past_horizon", "occurrencePastHorizon"],
+		["occurrence_future_horizon", "occurrenceFutureHorizon"],
 		["blockedBy", "blockedBy"],
 		["googleCalendarExceptionOriginalScheduled", "googleCalendarExceptionOriginalScheduled"],
 	];
@@ -800,8 +1267,16 @@ function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof Ta
 		dateCreated: "dateCreated",
 		dateModified: "dateModified",
 		recurrence: "recurrence",
+		recurrence_anchor: "recurrenceAnchor",
 		complete_instances: "completeInstances",
 		skipped_instances: "skippedInstances",
+		recurrence_parent: "recurrenceParent",
+		occurrence_date: "occurrenceDate",
+		occurrence_materialization: "occurrenceMaterialization",
+		occurrence_next_trigger: "occurrenceNextTrigger",
+		occurrence_template: "occurrenceTemplate",
+		occurrence_past_horizon: "occurrencePastHorizon",
+		occurrence_future_horizon: "occurrenceFutureHorizon",
 		timeEntries: "timeEntries",
 		blockedBy: "blockedBy",
 		reminders: "reminders",
@@ -809,6 +1284,254 @@ function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof Ta
 	};
 	const mappingKey = explicit[property];
 	return mappingKey ? fieldMapping[mappingKey] : undefined;
+}
+
+function isOccurrenceMaterializationMode(value: unknown): value is OccurrenceMaterializationMode {
+	return value === "manual" || value === "on_completion" || value === "rolling";
+}
+
+function isOccurrenceNextTrigger(value: unknown): value is OccurrenceNextTrigger {
+	return value === "completion" || value === "completion_or_skip";
+}
+
+function readOccurrenceMaterializationMode(value: unknown): OccurrenceMaterializationMode | undefined {
+	return isOccurrenceMaterializationMode(value) ? value : undefined;
+}
+
+function readOccurrenceNextTrigger(value: unknown): OccurrenceNextTrigger | undefined {
+	return isOccurrenceNextTrigger(value) ? value : undefined;
+}
+
+function normalizeOccurrenceTargetDate(value: string | Date): string {
+	return validateDateString(value instanceof Date ? formatDateForStorage(value) : getDatePart(value));
+}
+
+function resolveOccurrenceDateOrThrow(task: TaskInfo, targetDate?: string | Date): string {
+	return normalizeOccurrenceTargetDate(targetDate ?? task.occurrence_date ?? "");
+}
+
+function assertMaterializedOccurrence(task: TaskInfo, targetDate: string): void {
+	if (!task.recurrence_parent || !task.occurrence_date) {
+		throw new Error("task_not_materialized_occurrence");
+	}
+	if (task.occurrence_date !== targetDate) {
+		throw new Error("occurrence_date_mismatch");
+	}
+}
+
+function buildInheritedOccurrenceTask(parentTask: TaskInfo, targetDate: string): Partial<TaskInfo> {
+	const scheduled = parentTask.scheduled
+		? rebaseDateLikeToOccurrence(parentTask.scheduled, parentTask.scheduled, targetDate)
+		: targetDate;
+	const due = parentTask.due
+		? rebaseDateLikeToOccurrence(parentTask.due, parentTask.scheduled || parentTask.due, targetDate)
+		: undefined;
+
+	return removeUndefined({
+		title: parentTask.title,
+		priority: parentTask.priority,
+		due,
+		scheduled,
+		contexts: cloneArray(parentTask.contexts),
+		projects: cloneArray(parentTask.projects),
+		tags: cloneArray(parentTask.tags),
+		timeEstimate: parentTask.timeEstimate,
+		reminders: cloneObjectArray(parentTask.reminders),
+		blockedBy: cloneObjectArray(parentTask.blockedBy),
+		details: parentTask.details,
+		customProperties: cloneCustomProperties(parentTask.customProperties),
+	});
+}
+
+function rebaseDateLikeToOccurrence(
+	value: string,
+	parentAnchor: string,
+	targetDate: string
+): string | undefined {
+	try {
+		const valueDate = getDatePart(value);
+		const anchorDate = getDatePart(parentAnchor);
+		if (!valueDate || !anchorDate) return undefined;
+
+		const offsetDays = daysBetween(anchorDate, valueDate);
+		const rebasedDate = addDaysToDateString(targetDate, offsetDays);
+		return replaceDatePart(value, rebasedDate);
+	} catch {
+		return undefined;
+	}
+}
+
+function replaceDatePart(value: string, datePart: string): string {
+	const trimmed = value.trim();
+	const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})(.*)$/);
+	if (!match) return datePart;
+	return `${datePart}${match[2] ?? ""}`;
+}
+
+function daysBetween(startDate: string, endDate: string): number {
+	const msPerDay = 24 * 60 * 60 * 1000;
+	const start = parseDateToUTC(startDate).getTime();
+	const end = parseDateToUTC(endDate).getTime();
+	return Math.round((end - start) / msPerDay);
+}
+
+function addDaysToDateString(date: string, offsetDays: number): string {
+	const next = parseDateToUTC(date);
+	next.setUTCDate(next.getUTCDate() + offsetDays);
+	return formatDateForStorage(next);
+}
+
+function cloneArray<T>(value: readonly T[] | undefined): T[] | undefined {
+	return Array.isArray(value) ? [...value] : undefined;
+}
+
+function cloneObjectArray<T extends object>(value: readonly T[] | undefined): T[] | undefined {
+	return Array.isArray(value) ? value.map((entry) => ({ ...entry }) as T) : undefined;
+}
+
+function cloneCustomProperties(value: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+	if (!value || Object.keys(value).length === 0) return undefined;
+	return cloneRecord(value);
+}
+
+function mergeCustomProperties(
+	...values: Array<Record<string, unknown> | undefined>
+): Record<string, unknown> | undefined {
+	const merged: Record<string, unknown> = {};
+	for (const value of values) {
+		if (!value) continue;
+		Object.assign(merged, cloneRecord(value));
+	}
+	return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
+	const result: Record<string, unknown> = {};
+	for (const [key, entry] of Object.entries(value)) {
+		if (Array.isArray(entry)) {
+			result[key] = [...entry];
+		} else if (isPlainRecord(entry)) {
+			result[key] = { ...entry };
+		} else {
+			result[key] = entry;
+		}
+	}
+	return result;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isDueByRecurrenceRule(parentTask: TaskInfo, targetDate: string): boolean {
+	try {
+		return isDueByRRule(parentTask, parseDateToUTC(targetDate));
+	} catch {
+		return false;
+	}
+}
+
+function buildRecurringParentProgressionUpdates({
+	parentTask,
+	targetDate,
+	completeInstances,
+	skippedInstances,
+	currentTimestamp,
+	maintainDueDateOffsetInRecurring,
+	advanceCompletionAnchor,
+}: {
+	parentTask: TaskInfo;
+	targetDate: string;
+	completeInstances: string[];
+	skippedInstances: string[];
+	currentTimestamp: string;
+	maintainDueDateOffsetInRecurring: boolean;
+	advanceCompletionAnchor: boolean;
+}): Partial<TaskInfo> {
+	let recurrence = parentTask.recurrence;
+	if (typeof recurrence === "string" && recurrence.length > 0) {
+		if (advanceCompletionAnchor && (parentTask.recurrence_anchor || "scheduled") === "completion") {
+			recurrence = updateDTSTARTInRecurrenceRule(recurrence, targetDate) || recurrence;
+		} else if (!recurrence.includes("DTSTART:")) {
+			recurrence = addDTSTARTToRecurrenceRule(parentTask) || recurrence;
+		}
+	}
+
+	const workingTask: TaskInfo = {
+		...parentTask,
+		recurrence,
+		complete_instances: completeInstances,
+		skipped_instances: skippedInstances,
+	};
+	const nextDates = updateToNextScheduledOccurrence(
+		workingTask,
+		maintainDueDateOffsetInRecurring,
+		{ today: targetDate }
+	);
+	const updates: Partial<TaskInfo> = {
+		recurrence,
+		complete_instances: completeInstances,
+		skipped_instances: skippedInstances,
+		dateModified: currentTimestamp,
+	};
+	if (nextDates.scheduled) updates.scheduled = nextDates.scheduled;
+	if (nextDates.due) updates.due = nextDates.due;
+	return updates;
+}
+
+function buildMaterializedOccurrenceStatusPlan({
+	kind,
+	targetDate,
+	occurrenceTask,
+	parentTask,
+	updatedOccurrenceTask,
+	updatedParentTask,
+	occurrenceUpdates,
+	parentUpdates,
+	currentTimestamp,
+	materializeNextDate,
+	metadata,
+}: {
+	kind: MaterializedOccurrenceStatusPlan["kind"];
+	targetDate: string;
+	occurrenceTask: TaskInfo;
+	parentTask: TaskInfo;
+	updatedOccurrenceTask: TaskInfo;
+	updatedParentTask: TaskInfo;
+	occurrenceUpdates: Partial<TaskInfo>;
+	parentUpdates: Partial<TaskInfo>;
+	currentTimestamp: string;
+	materializeNextDate?: string;
+	metadata: Record<string, unknown>;
+}): MaterializedOccurrenceStatusPlan {
+	return {
+		kind,
+		targetDate,
+		updatedOccurrenceTask,
+		updatedParentTask,
+		occurrenceUpdates,
+		parentUpdates,
+		occurrenceFields: taskInfoToSpecFields(occurrenceUpdates),
+		parentFields: taskInfoToSpecFields(parentUpdates),
+		dateModified: currentTimestamp,
+		changed: hasTaskUpdateChanges(occurrenceTask, occurrenceUpdates) || hasTaskUpdateChanges(parentTask, parentUpdates),
+		materializeNextDate: materializeNextDate || undefined,
+		metadata,
+	};
+}
+
+function hasTaskUpdateChanges(task: Partial<TaskInfo>, updates: Partial<TaskInfo>): boolean {
+	return Object.entries(updates).some(([key, value]) => task[key as keyof TaskInfo] !== value);
+}
+
+function removeUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
+	const result: Partial<T> = {};
+	for (const [key, entry] of Object.entries(value)) {
+		if (entry !== undefined) {
+			result[key as keyof T] = entry as T[keyof T];
+		}
+	}
+	return result;
 }
 
 function stripTimeEntryDuration(entry: TimeEntry): TimeEntry {
