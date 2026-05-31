@@ -131,9 +131,18 @@ const materialized = buildMaterializeOccurrencePlan({
 	},
 	targetDate: "2026-06-01",
 	currentTimestamp: "2026-05-31T12:00:00Z",
+	templateTask: {
+		timeEstimate: 45,
+		contexts: ["work"],
+	},
+	overrides: {
+		scheduled: "2026-06-01T09:30:00",
+	},
 });
 
 // Host creates materialized.occurrenceTask if materialized.created is true.
+// Hosts can seed occurrence-owned planning fields through templateTask and
+// overrides. Parent recurrence/history/time entries are not copied to the child.
 
 const complete = buildMaterializedOccurrenceCompletePlan({
 	occurrenceTask: {
