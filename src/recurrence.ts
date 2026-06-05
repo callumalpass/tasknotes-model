@@ -228,8 +228,10 @@ export function updateToNextScheduledOccurrence(
 
 	if (nextOccurrence) {
 		try {
-			const originalScheduled = task.scheduled ? parseDateToUTC(task.scheduled) : null;
-			const originalDue = task.due ? parseDateToUTC(task.due) : null;
+			const originalScheduled = task.scheduled
+				? parseDateToUTC(getDatePart(task.scheduled))
+				: null;
+			const originalDue = task.due ? parseDateToUTC(getDatePart(task.due)) : null;
 			if (originalScheduled && originalDue) {
 				const dueWouldBeBeforeNextSchedule =
 					!maintainDueOffset && originalDue.getTime() < nextOccurrence.getTime();
