@@ -1,0 +1,43 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const packageRoot = resolve(import.meta.dirname, "..");
+const tempRoot = mkdtempSync(join(tmpdir(), "tasknotes-model-package-smoke-"));
+let tarball;
+
+try {
+  const packed = JSON.parse(
+    execFileSync(npm, ["pack", "--json"], {
+      cwd: packageRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "inherit"],
+    }),
+  );
+  tarball = resolve(packageRoot, packed[0].filename);
+
+  writeFileSync(
+    join(tempRoot, "package.json"),
+    JSON.stringify({ name: "tasknotes-model-package-smoke", private: true, type: "module" }),
+  );
+  writeFileSync(
+    join(tempRoot, "esm.mjs"),
+    'import * as model from "@tasknotes/model";\nif (Object.keys(model).length === 0) throw new Error("ESM export is empty");\n',
+  );
+  writeFileSync(
+    join(tempRoot, "cjs.cjs"),
+    'const model = require("@tasknotes/model");\nif (Object.keys(model).length === 0) throw new Error("CJS export is empty");\n',
+  );
+
+  execFileSync(npm, ["install", "--ignore-scripts", tarball], {
+    cwd: tempRoot,
+    stdio: "inherit",
+  });
+  execFileSync(process.execPath, ["esm.mjs"], { cwd: tempRoot, stdio: "inherit" });
+  execFileSync(process.execPath, ["cjs.cjs"], { cwd: tempRoot, stdio: "inherit" });
+} finally {
+  if (tarball) rmSync(tarball, { force: true });
+  rmSync(tempRoot, { recursive: true, force: true });
+}
