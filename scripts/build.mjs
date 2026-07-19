@@ -15,9 +15,10 @@ const entries = [
 	"operations",
 	"frontmatter",
 	"conformance",
+	"runtime",
 ];
 
-const external = ["rrule", "yaml", "zod"];
+const external = ["@callumalpass/mdbase-runtime", "rrule", "yaml", "zod"];
 
 await mkdir("dist/esm", { recursive: true });
 await mkdir("dist/cjs", { recursive: true });
