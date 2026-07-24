@@ -14,6 +14,7 @@ const entries = [
 	"validation",
 	"operations",
 	"frontmatter",
+	"mdbase",
 	"conformance",
 	"runtime",
 ];

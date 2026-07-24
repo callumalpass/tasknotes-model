@@ -132,6 +132,62 @@ export function evaluateCoreValidation(
 	statuses: readonly StatusConfig[]
 ): TaskValidationResult {
 	const result = validateTask(task);
+	for (const field of ["title", "status", "dateCreated", "dateModified"] as const) {
+		const value = task[field];
+		if (typeof value !== "string" || value.trim().length === 0) {
+			result.issues.push({
+				code: "missing_required",
+				message: `${field} is required`,
+				severity: "error",
+				field,
+			});
+		}
+	}
+
+	if (task.status && !statuses.some((status) => status.value === task.status)) {
+		result.issues.push({
+			code: "invalid_status",
+			message: `Unknown status "${task.status}"`,
+			severity: "error",
+			field: "status",
+		});
+	}
+
+	if (task.completedDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(task.completedDate)) {
+		result.issues.push({
+			code: "invalid_date_value",
+			message: "completedDate must be a YYYY-MM-DD date",
+			severity: "error",
+			field: "completedDate",
+		});
+	}
+
+	if (
+		task.status &&
+		isCompletedStatus(task.status, statuses) &&
+		!task.recurrence &&
+		!task.completedDate
+	) {
+		result.issues.push({
+			code: "missing_required",
+			message: "completedDate is required for a completed non-recurring task",
+			severity: "error",
+			field: "completedDate",
+		});
+	}
+
+	if (task.dateCreated && task.dateModified) {
+		const created = Date.parse(task.dateCreated);
+		const modified = Date.parse(task.dateModified);
+		if (Number.isFinite(created) && Number.isFinite(modified) && modified < created) {
+			result.issues.push({
+				code: "date_modified_before_created",
+				message: "dateModified must not be before dateCreated",
+				severity: "error",
+				field: "dateModified",
+			});
+		}
+	}
 	if (task.status && isCompletedStatus(task.status, statuses) && task.recurrence && task.completedDate) {
 		result.issues.push({
 			code: "recurring_task_completed_date",
