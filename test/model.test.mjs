@@ -11,6 +11,7 @@ import {
 	buildSpecStartTimeTrackingUpdate,
 	buildSpecStopTimeTrackingUpdate,
 	buildStartTimeTrackingPlan,
+	buildTaskUpdatePlan,
 	calculateTotalTrackedMinutes,
 	executeConformanceOperation,
 	formatDateForStorage,
@@ -88,6 +89,27 @@ test("parses dates with UTC storage semantics", () => {
 	assert.equal(formatDateForStorage(parseDateToUTC("2026-02-28")), "2026-02-28");
 	assert.equal(getDatePart("2026-02-28T10:30:00"), "2026-02-28");
 	assert.throws(() => parseDateToUTC("2026-02-30"), /Invalid date/);
+});
+
+test("keeps modification timestamps valid when a device clock moves backwards", () => {
+	const plan = buildTaskUpdatePlan({
+		originalTask: {
+			title: "Future-dated task",
+			status: "open",
+			priority: "normal",
+			path: "Tasks/future.md",
+			archived: false,
+			dateCreated: "2026-07-28T10:00:00.000Z",
+			dateModified: "2026-07-28T10:00:00.000Z",
+		},
+		updates: { title: "Editable future-dated task" },
+		fieldMapping: DEFAULT_FIELD_MAPPING,
+		now: "2026-07-21T10:00:00.000Z",
+		currentDateString: "2026-07-21",
+	});
+
+	assert.equal(plan.updatedTask.dateModified, "2026-07-28T10:00:00.001Z");
+	assert.equal(plan.dateModified, "2026-07-28T10:00:00.001Z");
 });
 
 test("recalculates recurring schedules with DTSTART", () => {

@@ -91,6 +91,9 @@ export function mapTaskFromFrontmatter(
 	const mapped: Partial<TaskInfo> = {
 		path: filePath,
 	};
+	if (typeof frontmatter.id === "string" && frontmatter.id.trim().length > 0) {
+		mapped.id = frontmatter.id;
+	}
 
 	if (frontmatter[mapping.title] !== undefined) {
 		const normalized = normalizeTitleValue(frontmatter[mapping.title]);

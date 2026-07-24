@@ -209,6 +209,11 @@ export function buildTaskUpdatePlan({
 	maintainDueDateOffsetInRecurring = true,
 }: BuildTaskUpdatePlanInput): TaskOperationPlan<TaskInfo> {
 	const normalizedUpdates = normalizeTaskUpdateInput(updates);
+	const dateModified = nextModifiedTimestamp(
+		now,
+		originalTask.dateCreated,
+		originalTask.dateModified
+	);
 	const recurrenceUpdates = buildTaskUpdateRecurrenceUpdates({
 		originalTask,
 		updates: normalizedUpdates,
@@ -219,7 +224,7 @@ export function buildTaskUpdatePlan({
 		updates: normalizedUpdates,
 		recurrenceUpdates,
 		newPath: originalTask.path,
-		dateModified: now,
+		dateModified,
 		currentDateString,
 		normalizedDetails: normalizeTaskUpdateDetails(normalizedUpdates),
 		isCompletedStatus: (status) => isCompletedStatus(status, statuses),
@@ -237,9 +242,25 @@ export function buildTaskUpdatePlan({
 		kind: "task.update",
 		updatedTask,
 		frontmatterPatch,
-		dateModified: now,
+		dateModified,
 		metadata: { recurrenceUpdates },
 	};
+}
+
+function nextModifiedTimestamp(
+	candidate: string,
+	dateCreated?: string,
+	previousModified?: string
+): string {
+	const candidateTime = Date.parse(candidate);
+	if (!Number.isFinite(candidateTime)) return candidate;
+	const storedTimes = [dateCreated, previousModified]
+		.map((value) => (value ? Date.parse(value) : Number.NaN))
+		.filter((value) => Number.isFinite(value));
+	if (storedTimes.length === 0) return candidate;
+	const floor = Math.max(...storedTimes);
+	if (candidateTime > floor) return candidate;
+	return new Date(floor + 1).toISOString();
 }
 
 export function normalizeTaskUpdateInput(updates: TaskUpdateInput): TaskUpdateInput {

@@ -48,6 +48,7 @@ The package exports both the root module and focused subpath modules:
 | `@tasknotes/model/validation` | Task and time-entry validation |
 | `@tasknotes/model/operations` | Host-independent task mutation planning, including materialized occurrence plans |
 | `@tasknotes/model/frontmatter` | Markdown task document parse/serialize helpers |
+| `@tasknotes/model/mdbase` | Canonical mdbase v0.3 config/type generation and TaskNotes extension resolution |
 | `@tasknotes/model/conformance` | tasknotes-spec conformance operation dispatcher |
 | `@tasknotes/model/runtime` | Host-independent mdbase runtime provider and host contracts |
 
@@ -193,5 +194,11 @@ npm test
 ```
 
 The package build emits ESM, CommonJS, and TypeScript declaration output under `dist`. Release tooling should build it before packing or publishing.
+
+The conformance adapter reports its claimed TaskNotes profile and implements
+the official `core-lite` operation surface. Its fixture run currently passes
+4,974 cases with zero failures; the extended-profile fixture remains outside
+that claim. The mdbase generator is covered by round-trip tests that resolve
+its emitted field roles and vocabularies back into model configuration.
 
 The Obsidian plugin uses this package through its service layer and keeps runtime-only behavior, such as Obsidian vault writes, metadata-cache link resolution, notices, and plugin-specific clock hooks, outside the model package.

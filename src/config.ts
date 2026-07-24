@@ -254,8 +254,9 @@ export function detectTaskFile(input: {
 			return frontmatterHasTag(frontmatter, tag) || bodyHasTag(body, tag);
 		}
 		if (method === "property") {
-			const propertyName = detection.propertyName || "";
-			const propertyValue = detection.propertyValue || "";
+			const raw = detection as typeof detection & { property_name?: string; property_value?: string };
+			const propertyName = detection.propertyName || raw.property_name || "";
+			const propertyValue = detection.propertyValue || raw.property_value || "";
 			if (!propertyName || !Object.prototype.hasOwnProperty.call(frontmatter, propertyName)) {
 				return false;
 			}
@@ -299,8 +300,36 @@ export function mapTasknotesPluginConfig(source: Record<string, unknown>): Recor
 			.map((entry) => String((entry as Record<string, unknown>).value));
 		out.status = {
 			values,
+			...(typeof source.defaultTaskStatus === "string" ? { default: source.defaultTaskStatus } : {}),
 			completed_values: completedValues,
 			...(skippedValues.length > 0 ? { skipped_values: skippedValues } : {}),
+		};
+	}
+
+	if (
+		typeof source.storeTitleInFilename === "boolean" ||
+		typeof source.taskFilenameFormat === "string" ||
+		typeof source.customFilenameTemplate === "string"
+	) {
+		out.title = {
+			...(typeof source.storeTitleInFilename === "boolean"
+				? { storage: source.storeTitleInFilename ? "filename" : "frontmatter" }
+				: {}),
+			...(typeof source.taskFilenameFormat === "string" ? { filename_format: source.taskFilenameFormat } : {}),
+			...(typeof source.customFilenameTemplate === "string"
+				? { custom_filename_template: source.customFilenameTemplate }
+				: {}),
+		};
+	}
+
+	if (isRecord(source.taskCreationDefaults)) {
+		out.templating = {
+			...(typeof source.taskCreationDefaults.useBodyTemplate === "boolean"
+				? { enabled: source.taskCreationDefaults.useBodyTemplate }
+				: {}),
+			...(typeof source.taskCreationDefaults.bodyTemplate === "string"
+				? { template_path: source.taskCreationDefaults.bodyTemplate }
+				: {}),
 		};
 	}
 
@@ -314,11 +343,42 @@ export function mapTasknotesPluginConfig(source: Record<string, unknown>): Recor
 	}
 
 	if (typeof source.tasksFolder === "string") {
-		out.collection = { default_folder: source.tasksFolder };
+		out.task_detection = {
+			...(isRecord(out.task_detection) ? out.task_detection : {}),
+			default_folder: source.tasksFolder,
+		};
 	}
 
-	if (typeof source.autoStopTimeTrackingOnComplete === "boolean") {
-		out.time_tracking = { auto_stop_on_complete: source.autoStopTimeTrackingOnComplete };
+	if (typeof source.excludedFolders === "string") {
+		out.task_detection = {
+			...(isRecord(out.task_detection) ? out.task_detection : {}),
+			excluded_folders: source.excludedFolders,
+		};
+	}
+
+	if (
+		typeof source.autoStopTimeTrackingOnComplete === "boolean" ||
+		typeof source.autoStopTimeTrackingNotification === "boolean"
+	) {
+		out.time_tracking = {
+			...(typeof source.autoStopTimeTrackingOnComplete === "boolean"
+				? { auto_stop_on_complete: source.autoStopTimeTrackingOnComplete }
+				: {}),
+			...(typeof source.autoStopTimeTrackingNotification === "boolean"
+				? { auto_stop_notification: source.autoStopTimeTrackingNotification }
+				: {}),
+		};
+	}
+
+	if (typeof source.moveArchivedTasks === "boolean" || typeof source.archiveFolder === "string") {
+		out.archive = {
+			...(typeof source.moveArchivedTasks === "boolean" ? { move_on_archive: source.moveArchivedTasks } : {}),
+			...(typeof source.archiveFolder === "string" ? { folder: source.archiveFolder } : {}),
+		};
+	}
+
+	if (typeof source.useFrontmatterMarkdownLinks === "boolean") {
+		out.links = { use_markdown_format: source.useFrontmatterMarkdownLinks };
 	}
 
 	if (
@@ -360,7 +420,7 @@ function inferCompletedStatuses(fields: Record<string, unknown>, statusFieldName
 		if (explicit.length > 0) return explicit;
 	}
 
-	if (Array.isArray(statusDef.values)) {
+	if (statusDef.tn_role === "status" && Array.isArray(statusDef.values)) {
 		const inferred = statusDef.values
 			.filter((value): value is string => typeof value === "string")
 			.filter((value) => {
