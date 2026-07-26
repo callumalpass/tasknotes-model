@@ -53,6 +53,11 @@ export function resolveModelConfig(input: Partial<TaskNotesModelConfig> = {}): T
 		recurrence: { ...DEFAULT_MODEL_CONFIG.recurrence, ...input.recurrence },
 		occurrences: { ...DEFAULT_MODEL_CONFIG.occurrences, ...input.occurrences },
 		timeTracking: { ...DEFAULT_MODEL_CONFIG.timeTracking, ...input.timeTracking },
+		nlp: input.nlp
+			? {
+					triggers: input.nlp.triggers.map((trigger) => ({ ...trigger })),
+				}
+			: undefined,
 	};
 }
 
