@@ -54,7 +54,9 @@ export function getFrontmatterTags(value: unknown): string[] {
 	const tags: string[] = [];
 	const seen = new Set<string>();
 	const addTag = (entry: unknown): void => {
-		const normalized = normalizeFrontmatterTag(String(entry));
+		const normalizedValue = normalizeStringValue(entry);
+		if (!normalizedValue) return;
+		const normalized = normalizeFrontmatterTag(normalizedValue);
 		if (!normalized || seen.has(normalized)) return;
 		seen.add(normalized);
 		tags.push(normalized);
@@ -518,7 +520,10 @@ export function readAssigneeIds(value: unknown): string[] | undefined {
 }
 
 function normalizeStringArrayValue(value: unknown): string[] {
-	return Array.isArray(value) ? value.map(String) : [String(value)];
+	const values = Array.isArray(value) ? value : [value];
+	return values
+		.map(normalizeStringValue)
+		.filter((entry): entry is string => entry !== undefined);
 }
 
 function normalizeNumberValue(value: unknown): number | undefined {
