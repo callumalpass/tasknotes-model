@@ -3,6 +3,7 @@ import test from "node:test";
 import YAML from "yaml";
 import {
 	buildTaskNotesMdbaseResources,
+	patchTaskNotesMdbaseTypeSettings,
 	resolveTaskNotesModelConfigFromMdbaseType,
 } from "../dist/esm/mdbase.js";
 
@@ -72,6 +73,113 @@ test("round-trips optional NLP trigger settings through the TaskNotes contract",
 				{ propertyId: "energy", trigger: "~", enabled: true },
 			],
 		}
+	);
+});
+
+test("patches portable model settings without replacing custom type content", () => {
+	const resources = buildTaskNotesMdbaseResources({
+		modelConfig: {
+			nlp: {
+				triggers: [
+					{ propertyId: "contexts", trigger: "@", enabled: true },
+				],
+			},
+		},
+	});
+	resources.type.schema.value.properties.client = {
+		type: "string",
+		description: "Preserve me",
+	};
+	resources.type["x-host"] = { custom: true };
+
+	const patched = patchTaskNotesMdbaseTypeSettings(resources.type, {
+		defaultStatus: "in-progress",
+		defaultPriority: "high",
+		recurrence: {
+			maintainDueDateOffset: false,
+			resetCheckboxesOnRecurrence: true,
+		},
+		occurrences: {
+			defaultMaterialization: "rolling",
+			defaultNextTrigger: "completion_or_skip",
+			pastHorizon: "p2d",
+			futureHorizon: "P30D",
+		},
+		timeTracking: { autoStopOnComplete: true },
+		links: { writeFormat: "markdown" },
+		archive: { moveOnArchive: true, folder: "Tasks/Archive" },
+		templating: {
+			templatePath: "Templates/Task.md",
+			enabled: true,
+		},
+		statusAutomation: {
+			done: { autoArchive: true, autoArchiveDelay: 15 },
+		},
+	});
+	const extension = patched["x-tasknotes"];
+	const resolved = resolveTaskNotesModelConfigFromMdbaseType(patched);
+
+	assert.equal(resolved.defaults.status, "in-progress");
+	assert.equal(resolved.defaults.priority, "high");
+	assert.equal(resolved.recurrence.maintainDueDateOffset, false);
+	assert.equal(resolved.recurrence.resetCheckboxesOnRecurrence, true);
+	assert.equal(resolved.occurrences.defaultMaterialization, "rolling");
+	assert.equal(resolved.occurrences.defaultNextTrigger, "completion_or_skip");
+	assert.equal(resolved.occurrences.pastHorizon, "P2D");
+	assert.equal(resolved.occurrences.futureHorizon, "P30D");
+	assert.equal(resolved.timeTracking.autoStopOnComplete, true);
+	assert.equal(extension.links.write_format, "markdown");
+	assert.deepEqual(extension.archive, {
+		tags_field: "tags",
+		archived_tag: "archived",
+		move_on_archive: true,
+		folder: "Tasks/Archive",
+	});
+	assert.equal(extension.templating.enabled, true);
+	assert.equal(extension.templating.template_path, "Templates/Task.md");
+	assert.equal(
+		extension.status.definitions.find(({ value }) => value === "done")
+			.auto_archive_delay_minutes,
+		15
+	);
+	assert.equal(patched.schema.value.properties.status.default, "in-progress");
+	assert.equal(patched.schema.value.properties.priority.default, "high");
+	assert.equal(patched.collection.read_defaults.status, "in-progress");
+	assert.equal(
+		patched.collection.read_defaults.occurrence_materialization,
+		"rolling"
+	);
+	assert.deepEqual(patched.schema.value.properties.client, {
+		type: "string",
+		description: "Preserve me",
+	});
+	assert.deepEqual(patched["x-host"], { custom: true });
+	assert.deepEqual(extension.nlp, resources.type["x-tasknotes"].nlp);
+	assert.equal(resources.type["x-tasknotes"].status.default, "open");
+});
+
+test("rejects invalid contract setting patches", () => {
+	const type = buildTaskNotesMdbaseResources().type;
+	assert.throws(
+		() =>
+			patchTaskNotesMdbaseTypeSettings(type, {
+				defaultStatus: "missing",
+			}),
+		/default status/
+	);
+	assert.throws(
+		() =>
+			patchTaskNotesMdbaseTypeSettings(type, {
+				templating: { enabled: true },
+			}),
+		/template path/
+	);
+	assert.throws(
+		() =>
+			patchTaskNotesMdbaseTypeSettings(type, {
+				occurrences: { futureHorizon: "tomorrow" },
+			}),
+		/ISO 8601/
 	);
 });
 
