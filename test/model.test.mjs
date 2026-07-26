@@ -70,6 +70,23 @@ test("maps TaskNotes frontmatter to normalized task data", () => {
 	assert.deepEqual(task.attachments, ["[[Attachments/receipt.jpg]]"]);
 });
 
+test("maps empty list-like frontmatter values to empty arrays", () => {
+	const task = mapTaskFromFrontmatter(
+		DEFAULT_FIELD_MAPPING,
+		{
+			title: "Empty list fields",
+			contexts: null,
+			projects: null,
+			tags: ["", null, "task"],
+		},
+		"Tasks/Empty list fields.md"
+	);
+
+	assert.deepEqual(task.contexts, []);
+	assert.deepEqual(task.projects, []);
+	assert.deepEqual(task.tags, ["task"]);
+});
+
 test("denormalizes task data to configured frontmatter", () => {
 	const frontmatter = mapTaskToFrontmatter(DEFAULT_FIELD_MAPPING, {
 		title: "Ship model",
