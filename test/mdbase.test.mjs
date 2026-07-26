@@ -43,6 +43,38 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	assert.deepEqual(YAML.parse(typeFrontmatter[1]), resources.type);
 });
 
+test("round-trips optional NLP trigger settings through the TaskNotes contract", () => {
+	const resources = buildTaskNotesMdbaseResources({
+		modelConfig: {
+			nlp: {
+				triggers: [
+					{ propertyId: "tags", trigger: "#", enabled: true },
+					{ propertyId: "priority", trigger: "!", enabled: false },
+					{ propertyId: "energy", trigger: "~", enabled: true },
+				],
+			},
+		},
+	});
+
+	assert.deepEqual(resources.type["x-tasknotes"].nlp, {
+		triggers: [
+			{ property_id: "tags", trigger: "#", enabled: true },
+			{ property_id: "priority", trigger: "!", enabled: false },
+			{ property_id: "energy", trigger: "~", enabled: true },
+		],
+	});
+	assert.deepEqual(
+		resolveTaskNotesModelConfigFromMdbaseType(resources.type).nlp,
+		{
+			triggers: [
+				{ propertyId: "tags", trigger: "#", enabled: true },
+				{ propertyId: "priority", trigger: "!", enabled: false },
+				{ propertyId: "energy", trigger: "~", enabled: true },
+			],
+		}
+	);
+});
+
 test("loads configured mappings and vocabularies from an mdbase task type", () => {
 	const resources = buildTaskNotesMdbaseResources({
 		modelConfig: {

@@ -177,6 +177,16 @@ export interface UserMappedField {
 	defaultValue?: string | number | boolean | string[];
 }
 
+export interface NlpTriggerConfig {
+	propertyId: string;
+	trigger: string;
+	enabled: boolean;
+}
+
+export interface NlpConfig {
+	triggers: NlpTriggerConfig[];
+}
+
 export type HideIdentifyingTagsMode = "all" | "exact-only";
 
 export interface TaskIdentificationConfig {
@@ -222,6 +232,7 @@ export interface TaskNotesModelConfig {
 	recurrence: RecurrenceConfig;
 	occurrences: OccurrenceConfig;
 	timeTracking: TimeTrackingConfig;
+	nlp?: NlpConfig;
 }
 
 export interface TaskDocument {

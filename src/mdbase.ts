@@ -427,6 +427,17 @@ export function buildTaskNotesMdbaseResources(
 		time_tracking: {
 			auto_stop_on_complete: modelConfig.timeTracking.autoStopOnComplete,
 		},
+		...(modelConfig.nlp
+			? {
+					nlp: {
+						triggers: modelConfig.nlp.triggers.map((trigger) => ({
+							property_id: trigger.propertyId,
+							trigger: trigger.trigger,
+							enabled: trigger.enabled,
+						})),
+					},
+				}
+			: {}),
 		templating: {
 			enabled: templateEnabled,
 			...(templateEnabled ? { template_path: templatePath } : {}),
@@ -554,6 +565,7 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	const recurrence = isRecord(extension.recurrence) ? extension.recurrence : {};
 	const occurrences = isRecord(extension.occurrences) ? extension.occurrences : {};
 	const timeTracking = isRecord(extension.time_tracking) ? extension.time_tracking : {};
+	const nlp = isRecord(extension.nlp) ? extension.nlp : {};
 	const defaultStatus = stringValue(status.default) ?? base.defaults.status;
 	const defaultPriority = stringValue(priority.default) ?? base.defaults.priority;
 
@@ -604,7 +616,34 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 				booleanValue(timeTracking.auto_stop_on_complete) ??
 				base.timeTracking.autoStopOnComplete,
 		},
+		nlp: resolveNlpConfig(nlp, base.nlp),
 	});
+}
+
+function resolveNlpConfig(
+	value: Record<string, unknown>,
+	fallback: TaskNotesModelConfig["nlp"]
+): TaskNotesModelConfig["nlp"] {
+	if (!Array.isArray(value.triggers)) {
+		return fallback
+			? { triggers: fallback.triggers.map((trigger) => ({ ...trigger })) }
+			: undefined;
+	}
+	const triggers = value.triggers.flatMap((raw) => {
+		if (!isRecord(raw)) return [];
+		const propertyId =
+			stringValue(raw.property_id) ?? stringValue(raw.propertyId);
+		const trigger = stringValue(raw.trigger);
+		if (!propertyId || !trigger) return [];
+		return [
+			{
+				propertyId,
+				trigger,
+				enabled: booleanValue(raw.enabled) ?? true,
+			},
+		];
+	});
+	return { triggers };
 }
 
 function validateVocabulary(
