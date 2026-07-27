@@ -199,6 +199,8 @@ The conformance adapter reports its claimed TaskNotes profile and implements
 the official `core-lite` operation surface. Its fixture run currently passes
 4,974 cases with zero failures; the extended-profile fixture remains outside
 that claim. The mdbase generator is covered by round-trip tests that resolve
-its emitted field roles and vocabularies back into model configuration.
+its emitted field roles, vocabularies, task-identification rule, and
+user-defined schema fields back into model configuration so filesystem-backed
+hosts can treat the type as a configuration provider.
 
 The Obsidian plugin uses this package through its service layer and keeps runtime-only behavior, such as Obsidian vault writes, metadata-cache link resolution, notices, and plugin-specific clock hooks, outside the model package.

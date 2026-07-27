@@ -186,6 +186,15 @@ test("projects and resolves the complete portable TaskNotes settings snapshot", 
 				propertyValue: "true",
 			},
 			storeTitleInFilename: false,
+			userFields: [
+				{
+					id: "effort",
+					displayName: "Effort",
+					key: "effort_points",
+					type: "number",
+					defaultValue: 3,
+				},
+			],
 			recurrence: {
 				maintainDueDateOffset: true,
 				resetCheckboxesOnRecurrence: true,
@@ -243,8 +252,39 @@ test("projects and resolves the complete portable TaskNotes settings snapshot", 
 	assert.equal(resolved.statuses.find(({ value }) => value === "done").autoArchiveDelay, 15);
 	assert.equal(resolved.statuses.find(({ value }) => value === "cancelled").isSkipped, true);
 	assert.equal(resolved.priorities.find(({ value }) => value === "critical").icon, "flame");
+	assert.equal(resolved.taskIdentification.method, "property");
+	assert.equal(resolved.taskIdentification.propertyName, "isTask");
+	assert.equal(resolved.taskIdentification.propertyValue, "true");
+	assert.deepEqual(resolved.userFields, [
+		{
+			id: "effort_points",
+			displayName: "Effort points",
+			key: "effort_points",
+			type: "number",
+			defaultValue: 3,
+		},
+	]);
 	assert.equal(resolved.occurrences.defaultMaterialization, "rolling");
 	assert.equal(resolved.timeTracking.autoStopOnComplete, false);
+});
+
+test("resolves tag identification from the canonical match rule", () => {
+	const resources = buildTaskNotesMdbaseResources({
+		modelConfig: {
+			defaults: { taskTag: "action" },
+			taskIdentification: {
+				method: "tag",
+				tag: "action",
+				propertyName: "",
+				propertyValue: "",
+			},
+		},
+	});
+	const resolved = resolveTaskNotesModelConfigFromMdbaseType(resources.type);
+
+	assert.equal(resolved.taskIdentification.method, "tag");
+	assert.equal(resolved.taskIdentification.tag, "action");
+	assert.equal(resolved.defaults.taskTag, "action");
 });
 
 test("emits a disclosed coercion-compatible schema for migrated v0.2 collections", () => {
@@ -258,4 +298,5 @@ test("emits a disclosed coercion-compatible schema for migrated v0.2 collections
 		coercion_compatible_schema: true,
 	});
 	assert.equal(resources.type["x-tasknotes"].generator.legacy_compatibility, true);
+	assert.ok(resources.type["x-tasknotes"].generator.managed_fields.includes("title"));
 });
