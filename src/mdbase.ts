@@ -81,6 +81,42 @@ export interface TaskNotesMdbaseResources {
 	modelConfig: TaskNotesModelConfig;
 }
 
+export interface TaskNotesMdbaseTypeSettingsPatch {
+	defaultStatus?: string;
+	defaultPriority?: string;
+	recurrence?: {
+		maintainDueDateOffset?: boolean;
+		resetCheckboxesOnRecurrence?: boolean;
+	};
+	occurrences?: {
+		defaultMaterialization?: "manual" | "on_completion" | "rolling";
+		defaultNextTrigger?: "completion" | "completion_or_skip";
+		pastHorizon?: string;
+		futureHorizon?: string;
+	};
+	timeTracking?: {
+		autoStopOnComplete?: boolean;
+	};
+	links?: {
+		writeFormat?: "wikilink" | "markdown";
+	};
+	archive?: {
+		moveOnArchive?: boolean;
+		folder?: string;
+	};
+	templating?: {
+		enabled?: boolean;
+		templatePath?: string;
+	};
+	statusAutomation?: Record<
+		string,
+		{
+			autoArchive?: boolean;
+			autoArchiveDelay?: number;
+		}
+	>;
+}
+
 type LifecycleEvent = "on_create" | "on_update";
 
 interface FieldOptions {
@@ -90,6 +126,147 @@ interface FieldOptions {
 	createValue?: Record<string, unknown>;
 	updateValue?: Record<string, unknown>;
 	links?: Array<{ suffix?: string; targetType: "task" | "any" }>;
+}
+
+/**
+ * Patch portable TaskNotes model settings in an existing mdbase type.
+ *
+ * The patch is deliberately constrained to settings whose schema vocabulary
+ * does not change. Custom properties, collection paths, lifecycle rules, and
+ * host extensions remain untouched.
+ */
+export function patchTaskNotesMdbaseTypeSettings(
+	type: Record<string, unknown>,
+	patch: TaskNotesMdbaseTypeSettingsPatch
+): Record<string, unknown> {
+	const result = cloneValue(type) as Record<string, unknown>;
+	const extension = isRecord(result["x-tasknotes"]) ? result["x-tasknotes"] : {};
+	if (extension.contract !== "tasknotes.task") {
+		throw new Error("The mdbase type is not a TaskNotes task contract.");
+	}
+	result["x-tasknotes"] = extension;
+	const model = resolveTaskNotesModelConfigFromMdbaseType(result);
+	const status = contractSection(extension, "status");
+	const priority = contractSection(extension, "priority");
+	const recurrence = contractSection(extension, "recurrence");
+	const occurrences = contractSection(extension, "occurrences");
+	const timeTracking = contractSection(extension, "time_tracking");
+	const links = contractSection(extension, "links");
+	const archive = contractSection(extension, "archive");
+	const templating = contractSection(extension, "templating");
+	const properties = isRecord(isRecord(result.schema) ? result.schema.value : undefined)
+		? (result.schema as Record<string, any>).value.properties
+		: undefined;
+	const collection = isRecord(result.collection) ? result.collection : {};
+	const readDefaults = isRecord(collection.read_defaults)
+		? collection.read_defaults
+		: {};
+	collection.read_defaults = readDefaults;
+	result.collection = collection;
+
+	if (patch.defaultStatus !== undefined) {
+		const value = requiredConfiguredValue(
+			patch.defaultStatus,
+			model.statuses.map((entry) => entry.value),
+			"default status"
+		);
+		status.default = value;
+		readDefaults[model.fieldMapping.status] = value;
+		if (isRecord(properties))
+			applySchemaDefault(properties[model.fieldMapping.status], value);
+	}
+	if (patch.defaultPriority !== undefined) {
+		const value = requiredConfiguredValue(
+			patch.defaultPriority,
+			model.priorities.map((entry) => entry.value),
+			"default priority"
+		);
+		priority.default = value;
+		readDefaults[model.fieldMapping.priority] = value;
+		if (isRecord(properties))
+			applySchemaDefault(properties[model.fieldMapping.priority], value);
+	}
+	if (patch.recurrence?.maintainDueDateOffset !== undefined)
+		recurrence.maintain_due_date_offset =
+			patch.recurrence.maintainDueDateOffset;
+	if (patch.recurrence?.resetCheckboxesOnRecurrence !== undefined)
+		recurrence.reset_body_checkboxes =
+			patch.recurrence.resetCheckboxesOnRecurrence;
+	if (patch.occurrences?.defaultMaterialization !== undefined) {
+		occurrences.default_materialization =
+			patch.occurrences.defaultMaterialization;
+		readDefaults[model.fieldMapping.occurrenceMaterialization] =
+			patch.occurrences.defaultMaterialization;
+	}
+	if (patch.occurrences?.defaultNextTrigger !== undefined) {
+		occurrences.default_next_trigger = patch.occurrences.defaultNextTrigger;
+		readDefaults[model.fieldMapping.occurrenceNextTrigger] =
+			patch.occurrences.defaultNextTrigger;
+	}
+	if (patch.occurrences?.pastHorizon !== undefined)
+		occurrences.past_horizon = requiredDuration(
+			patch.occurrences.pastHorizon,
+			"past occurrence horizon"
+		);
+	if (patch.occurrences?.futureHorizon !== undefined)
+		occurrences.future_horizon = requiredDuration(
+			patch.occurrences.futureHorizon,
+			"future occurrence horizon"
+		);
+	if (patch.timeTracking?.autoStopOnComplete !== undefined)
+		timeTracking.auto_stop_on_complete =
+			patch.timeTracking.autoStopOnComplete;
+	if (patch.links?.writeFormat !== undefined)
+		links.write_format = patch.links.writeFormat;
+	if (patch.archive?.moveOnArchive !== undefined)
+		archive.move_on_archive = patch.archive.moveOnArchive;
+	if (patch.archive?.folder !== undefined)
+		archive.folder = cleanPath(patch.archive.folder, "archive folder");
+	if (patch.templating?.templatePath !== undefined) {
+		const path = patch.templating.templatePath.trim();
+		if (path) templating.template_path = cleanPath(path, "template path");
+		else delete templating.template_path;
+	}
+	if (patch.templating?.enabled !== undefined) {
+		if (
+			patch.templating.enabled &&
+			!stringValue(templating.template_path)
+		)
+			throw new Error(
+				"template path must be set before task templating is enabled."
+			);
+		templating.enabled = patch.templating.enabled;
+	}
+	if (patch.statusAutomation) {
+		const supplied = new Map(Object.entries(patch.statusAutomation));
+		const definitions = definitionMap(status.definitions);
+		for (const value of supplied.keys()) {
+			if (!model.statuses.some((candidate) => candidate.value === value))
+				throw new Error(`Unknown task status "${value}".`);
+		}
+		status.definitions = model.statuses.map((entry) => {
+			const automation = supplied.get(entry.value);
+			const definition = {
+				...(definitions.get(entry.value) ?? statusDefinition(entry)),
+			};
+			if (automation?.autoArchive !== undefined)
+				definition.auto_archive = automation.autoArchive;
+			if (automation?.autoArchiveDelay !== undefined) {
+				if (
+					!Number.isInteger(automation.autoArchiveDelay) ||
+					automation.autoArchiveDelay < 0
+				)
+					throw new Error(
+						`Auto-archive delay for "${entry.value}" must be a non-negative integer.`
+					);
+				definition.auto_archive_delay_minutes =
+					automation.autoArchiveDelay;
+			}
+			return definition;
+		});
+	}
+
+	return result;
 }
 
 /**
@@ -427,6 +604,17 @@ export function buildTaskNotesMdbaseResources(
 		time_tracking: {
 			auto_stop_on_complete: modelConfig.timeTracking.autoStopOnComplete,
 		},
+		...(modelConfig.nlp
+			? {
+					nlp: {
+						triggers: modelConfig.nlp.triggers.map((trigger) => ({
+							property_id: trigger.propertyId,
+							trigger: trigger.trigger,
+							enabled: trigger.enabled,
+						})),
+					},
+				}
+			: {}),
 		templating: {
 			enabled: templateEnabled,
 			...(templatePath ? { template_path: templatePath } : {}),
@@ -560,6 +748,7 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	const timeTracking = isRecord(extension.time_tracking) ? extension.time_tracking : {};
 	const taskIdentification = resolveTaskIdentification(value.match, base.taskIdentification);
 	const userFields = resolveUserFields(schemaProperties, fieldMapping, base.userFields);
+	const nlp = isRecord(extension.nlp) ? extension.nlp : {};
 	const defaultStatus = stringValue(status.default) ?? base.defaults.status;
 	const defaultPriority = stringValue(priority.default) ?? base.defaults.priority;
 
@@ -616,6 +805,7 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 				booleanValue(timeTracking.auto_stop_on_complete) ??
 				base.timeTracking.autoStopOnComplete,
 		},
+		nlp: resolveNlpConfig(nlp, base.nlp),
 	});
 }
 
@@ -745,6 +935,32 @@ function isUserFieldDefault(value: unknown): value is UserMappedField["defaultVa
 		typeof value === "boolean" ||
 		(Array.isArray(value) && value.every((entry) => typeof entry === "string"))
 	);
+}
+
+function resolveNlpConfig(
+	value: Record<string, unknown>,
+	fallback: TaskNotesModelConfig["nlp"]
+): TaskNotesModelConfig["nlp"] {
+	if (!Array.isArray(value.triggers)) {
+		return fallback
+			? { triggers: fallback.triggers.map((trigger) => ({ ...trigger })) }
+			: undefined;
+	}
+	const triggers = value.triggers.flatMap((raw) => {
+		if (!isRecord(raw)) return [];
+		const propertyId =
+			stringValue(raw.property_id) ?? stringValue(raw.propertyId);
+		const trigger = stringValue(raw.trigger);
+		if (!propertyId || !trigger) return [];
+		return [
+			{
+				propertyId,
+				trigger,
+				enabled: booleanValue(raw.enabled) ?? true,
+			},
+		];
+	});
+	return { triggers };
 }
 
 function validateVocabulary(
@@ -1092,6 +1308,35 @@ function definitionMap(value: unknown): Map<string, Record<string, unknown>> {
 		if (key) result.set(key, entry);
 	}
 	return result;
+}
+
+function contractSection(
+	extension: Record<string, unknown>,
+	key: string
+): Record<string, unknown> {
+	const section = isRecord(extension[key]) ? extension[key] : {};
+	extension[key] = section;
+	return section;
+}
+
+function requiredConfiguredValue(
+	value: string,
+	allowed: readonly string[],
+	label: string
+): string {
+	const normalized = value.trim();
+	if (!allowed.includes(normalized))
+		throw new Error(
+			`${label} must be one of: ${allowed.join(", ")}.`
+		);
+	return normalized;
+}
+
+function requiredDuration(value: string, label: string): string {
+	const normalized = value.trim().toUpperCase();
+	if (!/^P(?=.+)(?:\d+(?:\.\d+)?Y)?(?:\d+(?:\.\d+)?M)?(?:\d+(?:\.\d+)?W)?(?:\d+(?:\.\d+)?D)?(?:T(?=.+)(?:\d+(?:\.\d+)?H)?(?:\d+(?:\.\d+)?M)?(?:\d+(?:\.\d+)?S)?)?$/.test(normalized))
+		throw new Error(`${label} must be an ISO 8601 duration.`);
+	return normalized;
 }
 
 function addLifecycleValue(
