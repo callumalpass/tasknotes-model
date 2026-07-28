@@ -1,6 +1,6 @@
 {
 	"name": "@tasknotes/model",
-	"version": "0.3.0-rc.4",
+	"version": "0.3.0-rc.5",
 	"description": "TaskNotes model, mapping, validation, recurrence, and operation-planning reference implementation.",
 	"license": "MIT",
 	"type": "module",
@@ -95,11 +95,6 @@
 			"types": "./dist/types/conformance.d.ts",
 			"import": "./dist/esm/conformance.js",
 			"require": "./dist/cjs/conformance.cjs"
-		},
-		"./runtime": {
-			"types": "./dist/types/runtime.d.ts",
-			"import": "./dist/esm/runtime.js",
-			"require": "./dist/cjs/runtime.cjs"
 		}
 	},
 	"files": [
@@ -119,7 +114,6 @@
 		"test:package": "node scripts/smoke-package.mjs"
 	},
 	"dependencies": {
-		"@callumalpass/mdbase-runtime": "0.1.0-rc.1",
 		"rrule": "^2.8.1",
 		"yaml": "^2.3.1",
 		"zod": "^3.24.0"
