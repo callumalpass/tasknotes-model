@@ -1,5 +1,9 @@
 import YAML from "yaml";
 import { resolveModelConfig } from "./config";
+import {
+	TASKNOTES_TASK_BINDING_SCHEMA,
+	TASKNOTES_TASK_SCHEMA,
+} from "./generated/tasknotes-data-contract";
 import { TASKNOTES_SPEC_VERSION } from "./types";
 import type {
 	FieldMapping,
@@ -33,6 +37,8 @@ export interface TaskNotesMdbaseOptions {
 	typeName?: string;
 	tasksFolder?: string;
 	typesFolder?: string;
+	contractsFolder?: string;
+	schemasFolder?: string;
 	modelConfig?: Partial<TaskNotesModelConfig>;
 	profiles?: readonly string[];
 	capabilities?: readonly string[];
@@ -70,15 +76,42 @@ export interface TaskNotesMdbaseOptions {
 
 export interface TaskNotesMdbaseResources {
 	config: Record<string, unknown>;
+	contract: Record<string, unknown>;
 	type: Record<string, unknown>;
+	taskSchema: Record<string, unknown>;
+	bindingSchema: Record<string, unknown>;
 	configDocument: string;
+	contractDocument: string;
 	typeDocument: string;
+	taskSchemaDocument: string;
+	bindingSchemaDocument: string;
 	paths: {
 		config: "mdbase.yaml";
+		contract: string;
 		type: string;
+		taskSchema: string;
+		bindingSchema: string;
 		records: string;
 	};
 	modelConfig: TaskNotesModelConfig;
+}
+
+export interface TaskNotesMdbaseTypePack {
+	manifest: {
+		kind: "mdbase.type-pack";
+		id: "tasknotes.task";
+		version: string;
+		name: string;
+		description: string;
+		resources: Array<{
+			kind: "contract" | "type" | "schema";
+			source: string;
+			target: string;
+			digest: string;
+		}>;
+	};
+	resources: Array<{ source: string; document: string }>;
+	provides: Array<{ id: "tasknotes.task"; version: string }>;
 }
 
 export interface TaskNotesMdbaseTypeSettingsPatch {
@@ -140,20 +173,21 @@ export function patchTaskNotesMdbaseTypeSettings(
 	patch: TaskNotesMdbaseTypeSettingsPatch
 ): Record<string, unknown> {
 	const result = cloneValue(type) as Record<string, unknown>;
-	const extension = isRecord(result["x-tasknotes"]) ? result["x-tasknotes"] : {};
-	if (extension.contract !== "tasknotes.task") {
+	const implementation = taskNotesImplementation(result);
+	if (!implementation) {
 		throw new Error("The mdbase type is not a TaskNotes task contract.");
 	}
-	result["x-tasknotes"] = extension;
+	const binding = isRecord(implementation.binding) ? implementation.binding : {};
+	implementation.binding = binding;
 	const model = resolveTaskNotesModelConfigFromMdbaseType(result);
-	const status = contractSection(extension, "status");
-	const priority = contractSection(extension, "priority");
-	const recurrence = contractSection(extension, "recurrence");
-	const occurrences = contractSection(extension, "occurrences");
-	const timeTracking = contractSection(extension, "time_tracking");
-	const links = contractSection(extension, "links");
-	const archive = contractSection(extension, "archive");
-	const templating = contractSection(extension, "templating");
+	const status = contractSection(binding, "status");
+	const priority = contractSection(binding, "priority");
+	const recurrence = contractSection(binding, "recurrence");
+	const occurrences = contractSection(binding, "occurrences");
+	const timeTracking = contractSection(binding, "time_tracking");
+	const links = contractSection(binding, "links");
+	const archive = contractSection(binding, "archive");
+	const templating = contractSection(binding, "templating");
 	const properties = isRecord(isRecord(result.schema) ? result.schema.value : undefined)
 		? (result.schema as Record<string, any>).value.properties
 		: undefined;
@@ -282,6 +316,17 @@ export function buildTaskNotesMdbaseResources(
 	const typeName = cleanSegment(options.typeName ?? "task", "typeName");
 	const tasksFolder = cleanOptionalPath(options.tasksFolder ?? "tasks", "tasksFolder");
 	const typesFolder = cleanPath(options.typesFolder ?? "_types", "typesFolder");
+	const contractsFolder = cleanPath(
+		options.contractsFolder ?? "_contracts",
+		"contractsFolder"
+	);
+	const schemasFolder = cleanPath(
+		options.schemasFolder ?? "_schemas/tasknotes",
+		"schemasFolder"
+	);
+	if (contractsFolder === typesFolder) {
+		throw new Error("contractsFolder must differ from typesFolder.");
+	}
 	const modelConfig = resolveModelConfig(options.modelConfig);
 	const profiles = uniqueStrings(options.profiles ?? DEFAULT_TASKNOTES_MDBASE_PROFILES);
 	const capabilities = uniqueStrings(
@@ -310,6 +355,7 @@ export function buildTaskNotesMdbaseResources(
 		description: collectionDescription,
 		settings: {
 			types_folder: typesFolder,
+			contracts_folder: contractsFolder,
 			record_extensions: ["md"],
 			validation: options.collection?.validation ?? "warn",
 			explicit_type_keys: ["type", "types"],
@@ -548,13 +594,9 @@ export function buildTaskNotesMdbaseResources(
 	const templateEnabled = options.templating?.enabled === true && Boolean(templatePath);
 	const occurrenceTemplateEnabled =
 		options.templating?.occurrenceEnabled === true && Boolean(occurrenceTemplatePath);
-	const extension: Record<string, unknown> = {
-		contract: "tasknotes.task",
-		version: 1,
-		spec_version: TASKNOTES_SPEC_VERSION,
+	const binding: Record<string, unknown> = {
 		profiles,
 		capabilities,
-		field_roles: fieldRoles,
 		title: {
 			storage: modelConfig.storeTitleInFilename ? "filename" : "frontmatter",
 			filename_format: filenameFormat,
@@ -596,7 +638,6 @@ export function buildTaskNotesMdbaseResources(
 			write_format: options.links?.writeFormat ?? "wikilink",
 		},
 		archive: {
-			tags_field: "tags",
 			archived_tag: mapping.archiveTag,
 			move_on_archive: options.archive?.moveOnArchive === true,
 			...(options.archive?.folder?.trim() ? { folder: options.archive.folder.trim() } : {}),
@@ -617,21 +658,23 @@ export function buildTaskNotesMdbaseResources(
 			: {}),
 		templating: {
 			enabled: templateEnabled,
-			...(templateEnabled ? { template_path: templatePath } : {}),
+			...(templatePath ? { template_path: templatePath } : {}),
 			occurrence_enabled: occurrenceTemplateEnabled,
-			...(occurrenceTemplateEnabled
+			...(occurrenceTemplatePath
 				? { occurrence_template_path: occurrenceTemplatePath }
 				: {}),
 		},
-		compatibility: { read_aliases: true },
+	};
+	const generator: Record<string, unknown> = {
+		managed_fields: Object.keys(properties).sort(),
 	};
 	if (omittedCollectionPaths.size > 0 || legacyCompatibility) {
-		extension.generator = {
+		Object.assign(generator, {
 			...(omittedCollectionPaths.size > 0
 				? { omitted_collection_paths: [...omittedCollectionPaths].sort() }
 				: {}),
 			...(legacyCompatibility ? { legacy_compatibility: true } : {}),
-		};
+		});
 	}
 
 	const schema: Record<string, unknown> = {
@@ -665,16 +708,66 @@ export function buildTaskNotesMdbaseResources(
 		},
 		collection,
 		lifecycle,
-		"x-tasknotes": extension,
+		implements: [
+			{
+				contract: "tasknotes.task",
+				version: TASKNOTES_SPEC_VERSION,
+				fields: fieldRoles,
+				binding,
+			},
+		],
+		"x-tasknotes-generator": generator,
 		...(legacyCompatibility
 			? { "x-legacy-v0.2": { coercion_compatible_schema: true } }
 			: {}),
 	};
+	const taskSchema = cloneValue(TASKNOTES_TASK_SCHEMA) as Record<string, unknown>;
+	const bindingSchema = cloneValue(
+		TASKNOTES_TASK_BINDING_SCHEMA
+	) as Record<string, unknown>;
+	const contract: Record<string, unknown> = {
+		kind: "mdbase.contract",
+		id: "tasknotes.task",
+		version: TASKNOTES_SPEC_VERSION,
+		name: "TaskNotes task",
+		description: `Portable task data and behavior defined by tasknotes-spec ${TASKNOTES_SPEC_VERSION}.`,
+		schema: {
+			dialect: "json-schema-2020-12",
+			ref: relativeResourceReference(
+				`${contractsFolder}/tasknotes.task.md`,
+				`${schemasFolder}/tasknotes-task.schema.json`
+			),
+		},
+		binding_schema: {
+			dialect: "json-schema-2020-12",
+			ref: relativeResourceReference(
+				`${contractsFolder}/tasknotes.task.md`,
+				`${schemasFolder}/tasknotes-task-binding.schema.json`
+			),
+		},
+	};
+	const taskSchemaDocument = `${JSON.stringify(taskSchema, null, 2)}\n`;
+	const bindingSchemaDocument = `${JSON.stringify(bindingSchema, null, 2)}\n`;
+	const contractDocument = [
+		"---",
+		YAML.stringify(contract, { lineWidth: 0 }).trimEnd(),
+		"---",
+		"",
+		"# TaskNotes task contract",
+		"",
+		"Types implement this contract through `implements`; applications consume",
+		"the normalized contract view rather than assuming frontmatter names.",
+		"",
+	].join("\n");
 
 	return {
 		config,
+		contract,
 		type,
+		taskSchema,
+		bindingSchema,
 		configDocument: `${YAML.stringify(config, { lineWidth: 0 }).trimEnd()}\n`,
+		contractDocument,
 		typeDocument: [
 			"---",
 			YAML.stringify(type, { lineWidth: 0 }).trimEnd(),
@@ -682,20 +775,88 @@ export function buildTaskNotesMdbaseResources(
 			"",
 			"# Task",
 			"",
-			"This type definition is generated from TaskNotes settings for mdbase v0.3.",
+			"This type definition implements the TaskNotes contract for this mdbase collection.",
 			"Its JSON Schema describes persisted task frontmatter; collection and lifecycle",
-			"metadata describe generic mdbase behavior; `x-tasknotes` records the optional",
-			"TaskNotes task contract.",
+			"metadata describe generic mdbase behavior; `implements` maps the portable",
+			"TaskNotes task view and supplies TaskNotes behavior.",
 			"",
-			"This file is automatically generated and should not be edited manually.",
+			"Changes made here are loaded by TaskNotes. Portable changes made in TaskNotes",
+			"settings are written back while unknown extensions are preserved.",
 			"",
 		].join("\n"),
+		taskSchemaDocument,
+		bindingSchemaDocument,
 		paths: {
 			config: "mdbase.yaml",
+			contract: `${contractsFolder}/tasknotes.task.md`,
 			type: `${typesFolder}/${typeName}.md`,
+			taskSchema: `${schemasFolder}/tasknotes-task.schema.json`,
+			bindingSchema: `${schemasFolder}/tasknotes-task-binding.schema.json`,
 			records: tasksFolder,
 		},
 		modelConfig,
+	};
+}
+
+/**
+ * Package generated TaskNotes artifacts as one connector-installable transaction.
+ *
+ * The pack deliberately excludes `mdbase.yaml`: applications may add this
+ * contract to an existing collection without taking ownership of collection
+ * configuration.
+ */
+export async function buildTaskNotesMdbaseTypePack(
+	resources: TaskNotesMdbaseResources
+): Promise<TaskNotesMdbaseTypePack> {
+	const typeSource = `types/${resources.paths.type.split("/").slice(-1)[0]}`;
+	const definitions = [
+		{
+			kind: "contract" as const,
+			source: "contracts/tasknotes.task.md",
+			target: resources.paths.contract,
+			document: resources.contractDocument,
+		},
+		{
+			kind: "type" as const,
+			source: typeSource,
+			target: resources.paths.type,
+			document: resources.typeDocument,
+		},
+		{
+			kind: "schema" as const,
+			source: "schemas/tasknotes-task.schema.json",
+			target: resources.paths.taskSchema,
+			document: resources.taskSchemaDocument,
+		},
+		{
+			kind: "schema" as const,
+			source: "schemas/tasknotes-task-binding.schema.json",
+			target: resources.paths.bindingSchema,
+			document: resources.bindingSchemaDocument,
+		},
+	];
+	return {
+		manifest: {
+			kind: "mdbase.type-pack",
+			id: "tasknotes.task",
+			version: TASKNOTES_SPEC_VERSION,
+			name: "TaskNotes task",
+			description:
+				"TaskNotes task contract, implementation, and referenced JSON Schemas.",
+			resources: await Promise.all(
+				definitions.map(async ({ kind, source, target, document }) => ({
+					kind,
+					source,
+					target,
+					digest: await sha256(document),
+				}))
+			),
+		},
+		resources: definitions.map(({ source, document }) => ({
+			source,
+			document,
+		})),
+		provides: [{ id: "tasknotes.task", version: TASKNOTES_SPEC_VERSION }],
 	};
 }
 
@@ -705,9 +866,13 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	fallback: Partial<TaskNotesModelConfig> = {}
 ): TaskNotesModelConfig {
 	const base = resolveModelConfig(fallback);
-	if (!isRecord(value) || !isRecord(value["x-tasknotes"])) return base;
-	const extension = value["x-tasknotes"];
-	const roles = isRecord(extension.field_roles) ? extension.field_roles : {};
+	if (!isRecord(value)) return base;
+	const implementation = taskNotesImplementation(value);
+	if (!implementation) return base;
+	const extension = isRecord(implementation.binding)
+		? implementation.binding
+		: {};
+	const roles = isRecord(implementation.fields) ? implementation.fields : {};
 	const fieldMapping = { ...base.fieldMapping };
 	for (const key of Object.keys(fieldMapping) as (keyof FieldMapping)[]) {
 		const candidate = roles[key];
@@ -742,6 +907,8 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	const recurrence = isRecord(extension.recurrence) ? extension.recurrence : {};
 	const occurrences = isRecord(extension.occurrences) ? extension.occurrences : {};
 	const timeTracking = isRecord(extension.time_tracking) ? extension.time_tracking : {};
+	const taskIdentification = resolveTaskIdentification(value.match, base.taskIdentification);
+	const userFields = resolveUserFields(schemaProperties, fieldMapping, base.userFields);
 	const nlp = isRecord(extension.nlp) ? extension.nlp : {};
 	const defaultStatus = stringValue(status.default) ?? base.defaults.status;
 	const defaultPriority = stringValue(priority.default) ?? base.defaults.priority;
@@ -759,8 +926,14 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 			priority: priorities.some((entry) => entry.value === defaultPriority)
 				? defaultPriority
 				: priorities[0]?.value ?? base.defaults.priority,
+			taskTag:
+				taskIdentification.method === "tag"
+					? taskIdentification.tag
+					: base.defaults.taskTag,
 		},
+		taskIdentification,
 		storeTitleInFilename: title.storage === "filename",
+		userFields,
 		recurrence: {
 			...base.recurrence,
 			maintainDueDateOffset:
@@ -795,6 +968,134 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 		},
 		nlp: resolveNlpConfig(nlp, base.nlp),
 	});
+}
+
+function resolveTaskIdentification(
+	value: unknown,
+	fallback: TaskNotesModelConfig["taskIdentification"]
+): TaskNotesModelConfig["taskIdentification"] {
+	if (!isRecord(value) || !isRecord(value.where)) {
+		return { ...fallback };
+	}
+
+	const entries = Object.entries(value.where);
+	if (entries.length !== 1) {
+		return { ...fallback };
+	}
+
+	const [propertyName, predicate] = entries[0];
+	if (!isRecord(predicate)) {
+		return { ...fallback };
+	}
+
+	if (propertyName === "tags") {
+		const tag = stringValue(predicate.contains);
+		return tag
+			? {
+					...fallback,
+					method: "tag",
+					tag,
+				}
+			: { ...fallback };
+	}
+
+	if (Object.prototype.hasOwnProperty.call(predicate, "eq")) {
+		const rawValue = predicate.eq;
+		if (
+			typeof rawValue !== "string" &&
+			typeof rawValue !== "number" &&
+			typeof rawValue !== "boolean"
+		) {
+			return { ...fallback };
+		}
+		return {
+			...fallback,
+			method: "property",
+			propertyName,
+			propertyValue: String(rawValue),
+		};
+	}
+
+	if (predicate.exists === true) {
+		return {
+			...fallback,
+			method: "property",
+			propertyName,
+			propertyValue: "",
+		};
+	}
+
+	return { ...fallback };
+}
+
+function resolveUserFields(
+	schemaProperties: Record<string, unknown>,
+	fieldMapping: FieldMapping,
+	fallback: UserMappedField[]
+): UserMappedField[] {
+	const reserved = new Set([...Object.values(fieldMapping), "id", "tags"]);
+	const resolved: UserMappedField[] = [];
+
+	for (const [key, schema] of Object.entries(schemaProperties)) {
+		if (reserved.has(key)) continue;
+		const type = resolveUserFieldType(schema);
+		if (!type) continue;
+		const existing = fallback.find((field) => field.key === key);
+		const defaultValue = readSchemaDefault(schema);
+		resolved.push({
+			id: existing?.id ?? key,
+			displayName: existing?.displayName ?? humanize(key),
+			key,
+			type,
+			...(defaultValue !== undefined ? { defaultValue } : {}),
+		});
+	}
+
+	return resolved;
+}
+
+function resolveUserFieldType(value: unknown): UserMappedField["type"] | null {
+	if (!isRecord(value)) return null;
+	if (Array.isArray(value.anyOf)) {
+		for (const branch of value.anyOf) {
+			const resolved = resolveUserFieldType(branch);
+			if (resolved) return resolved;
+		}
+		return null;
+	}
+	if (value.format === "date") return "date";
+	if (value.type === "string") return "text";
+	if (value.type === "number" || value.type === "integer") return "number";
+	if (value.type === "boolean") return "boolean";
+	if (value.type === "array") return "list";
+	return null;
+}
+
+function readSchemaDefault(value: unknown): UserMappedField["defaultValue"] | undefined {
+	if (!isRecord(value)) return undefined;
+	if (value.default !== undefined) {
+		return isUserFieldDefault(value.default)
+			? Array.isArray(value.default)
+				? [...value.default]
+				: value.default
+			: undefined;
+	}
+	if (Array.isArray(value.anyOf)) {
+		for (const branch of value.anyOf) {
+			const resolved = readSchemaDefault(branch);
+			if (resolved !== undefined) return resolved;
+		}
+	}
+	return undefined;
+}
+
+function isUserFieldDefault(value: unknown): value is UserMappedField["defaultValue"] {
+	return (
+		typeof value === "string" ||
+		typeof value === "number" ||
+		typeof value === "boolean" ||
+		(Array.isArray(value) && value.every((entry) => typeof entry === "string"))
+	);
 }
 
 function resolveNlpConfig(
@@ -1179,6 +1480,39 @@ function contractSection(
 	return section;
 }
 
+function taskNotesImplementation(
+	type: Record<string, unknown>
+): Record<string, any> | undefined {
+	if (!Array.isArray(type.implements)) return undefined;
+	return type.implements.find(
+		(candidate): candidate is Record<string, any> =>
+			isRecord(candidate) &&
+			candidate.contract === "tasknotes.task" &&
+			candidate.version === TASKNOTES_SPEC_VERSION
+	);
+}
+
+function relativeResourceReference(
+	sourcePath: string,
+	targetPath: string
+): string {
+	const sourceDirectory = sourcePath.split("/").slice(0, -1);
+	const target = targetPath.split("/");
+	let common = 0;
+	while (
+		common < sourceDirectory.length &&
+		common < target.length &&
+		sourceDirectory[common] === target[common]
+	) {
+		common += 1;
+	}
+	const segments = [
+		...sourceDirectory.slice(common).map(() => ".."),
+		...target.slice(common),
+	];
+	return segments.join("/");
+}
+
 function requiredConfiguredValue(
 	value: string,
 	allowed: readonly string[],
@@ -1271,6 +1605,14 @@ function cloneValue(value: unknown): unknown {
 		);
 	}
 	return value;
+}
+
+async function sha256(value: string): Promise<string> {
+	const bytes = new TextEncoder().encode(value);
+	const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+	return `sha256:${Array.from(new Uint8Array(digest), (byte) =>
+		byte.toString(16).padStart(2, "0")
+	).join("")}`;
 }
 
 function isRecord(value: unknown): value is Record<string, any> {
