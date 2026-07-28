@@ -112,6 +112,7 @@
 	},
 	"scripts": {
 		"clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+		"sync:mdbase-contract": "node scripts/sync-tasknotes-contract.mjs",
 		"build": "npm run clean && node scripts/build.mjs && tsc -p tsconfig.types.json",
 		"prepack": "npm run build",
 		"test": "npm run build && node --test test/**/*.test.mjs",

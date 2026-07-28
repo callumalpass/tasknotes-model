@@ -3,18 +3,35 @@ import test from "node:test";
 import YAML from "yaml";
 import {
 	buildTaskNotesMdbaseResources,
+	buildTaskNotesMdbaseTypePack,
 	patchTaskNotesMdbaseTypeSettings,
 	resolveTaskNotesModelConfigFromMdbaseType,
 } from "../dist/esm/mdbase.js";
 
+function implementation(type) {
+	return type.implements.find(
+		(entry) =>
+			entry.contract === "tasknotes.task" && entry.version === "0.2.0"
+	);
+}
+
+function binding(type) {
+	return implementation(type).binding;
+}
+
 test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	const resources = buildTaskNotesMdbaseResources();
 	const type = resources.type;
-	const extension = type["x-tasknotes"];
+	const taskImplementation = implementation(type);
+	const extension = taskImplementation.binding;
 	const schema = type.schema.value;
 
 	assert.equal(resources.config.spec_version, "0.3.0");
-	assert.equal(extension.spec_version, "0.2.0");
+	assert.equal(resources.config.settings.contracts_folder, "_contracts");
+	assert.equal(resources.contract.id, "tasknotes.task");
+	assert.equal(resources.contract.version, "0.2.0");
+	assert.equal(taskImplementation.contract, "tasknotes.task");
+	assert.equal(taskImplementation.version, "0.2.0");
 	assert.deepEqual(extension.profiles, [
 		"core-lite",
 		"recurrence",
@@ -31,17 +48,56 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 		"archive",
 		"templating",
 	]);
-	assert.equal(extension.field_roles.completedDate, "completedDate");
-	assert.equal(extension.field_roles.id, "id");
+	assert.equal(taskImplementation.fields.completedDate, "completedDate");
+	assert.equal(taskImplementation.fields.id, "id");
 	assert.deepEqual(type.collection.unique, [{ field: "id", scope: "type" }]);
 	assert.deepEqual(type.lifecycle.on_create.set.id, { uuid: true });
 	assert.deepEqual(schema.properties.completedDate, { type: "string", format: "date" });
 	assert.deepEqual(schema.properties.dateModified, { type: "string", format: "date-time" });
 	assert.deepEqual(YAML.parse(resources.configDocument), resources.config);
+	assert.deepEqual(JSON.parse(resources.taskSchemaDocument), resources.taskSchema);
+	assert.deepEqual(
+		JSON.parse(resources.bindingSchemaDocument),
+		resources.bindingSchema
+	);
 
 	const typeFrontmatter = resources.typeDocument.match(/^---\n([\s\S]*?)\n---\n/);
 	assert.ok(typeFrontmatter);
 	assert.deepEqual(YAML.parse(typeFrontmatter[1]), resources.type);
+	const contractFrontmatter =
+		resources.contractDocument.match(/^---\n([\s\S]*?)\n---\n/);
+	assert.ok(contractFrontmatter);
+	assert.deepEqual(YAML.parse(contractFrontmatter[1]), resources.contract);
+});
+
+test("packages the contract, implementation, and schemas as one digest-pinned type pack", async () => {
+	const resources = buildTaskNotesMdbaseResources({ typeName: "action" });
+	const pack = await buildTaskNotesMdbaseTypePack(resources);
+
+	assert.deepEqual(pack.provides, [
+		{ id: "tasknotes.task", version: "0.2.0" },
+	]);
+	assert.equal(pack.manifest.kind, "mdbase.type-pack");
+	assert.equal(pack.manifest.id, "tasknotes.task");
+	assert.equal(pack.manifest.resources.length, 4);
+	assert.deepEqual(
+		pack.manifest.resources.map(({ kind, target }) => [kind, target]),
+		[
+			["contract", "_contracts/tasknotes.task.md"],
+			["type", "_types/action.md"],
+			["schema", "_schemas/tasknotes/tasknotes-task.schema.json"],
+			[
+				"schema",
+				"_schemas/tasknotes/tasknotes-task-binding.schema.json",
+			],
+		]
+	);
+	for (const declared of pack.manifest.resources) {
+		assert.match(declared.digest, /^sha256:[0-9a-f]{64}$/);
+		assert.ok(
+			pack.resources.some((resource) => resource.source === declared.source)
+		);
+	}
 });
 
 test("round-trips optional NLP trigger settings through the TaskNotes contract", () => {
@@ -57,7 +113,7 @@ test("round-trips optional NLP trigger settings through the TaskNotes contract",
 		},
 	});
 
-	assert.deepEqual(resources.type["x-tasknotes"].nlp, {
+	assert.deepEqual(binding(resources.type).nlp, {
 		triggers: [
 			{ property_id: "tags", trigger: "#", enabled: true },
 			{ property_id: "priority", trigger: "!", enabled: false },
@@ -116,7 +172,7 @@ test("patches portable model settings without replacing custom type content", ()
 			done: { autoArchive: true, autoArchiveDelay: 15 },
 		},
 	});
-	const extension = patched["x-tasknotes"];
+	const extension = binding(patched);
 	const resolved = resolveTaskNotesModelConfigFromMdbaseType(patched);
 
 	assert.equal(resolved.defaults.status, "in-progress");
@@ -130,7 +186,6 @@ test("patches portable model settings without replacing custom type content", ()
 	assert.equal(resolved.timeTracking.autoStopOnComplete, true);
 	assert.equal(extension.links.write_format, "markdown");
 	assert.deepEqual(extension.archive, {
-		tags_field: "tags",
 		archived_tag: "archived",
 		move_on_archive: true,
 		folder: "Tasks/Archive",
@@ -154,8 +209,8 @@ test("patches portable model settings without replacing custom type content", ()
 		description: "Preserve me",
 	});
 	assert.deepEqual(patched["x-host"], { custom: true });
-	assert.deepEqual(extension.nlp, resources.type["x-tasknotes"].nlp);
-	assert.equal(resources.type["x-tasknotes"].status.default, "open");
+	assert.deepEqual(extension.nlp, binding(resources.type).nlp);
+	assert.equal(binding(resources.type).status.default, "open");
 });
 
 test("rejects invalid contract setting patches", () => {
@@ -216,10 +271,11 @@ test("projects configured mappings and status vocabularies into the type", () =>
 			defaults: { status: "todo" },
 		},
 	});
-	const extension = resources.type["x-tasknotes"];
+	const taskImplementation = implementation(resources.type);
+	const extension = taskImplementation.binding;
 	const schema = resources.type.schema.value;
 
-	assert.equal(extension.field_roles.completedDate, "finished_on");
+	assert.equal(taskImplementation.fields.completedDate, "finished_on");
 	assert.deepEqual(extension.status.completed_values, ["shipped"]);
 	assert.deepEqual(schema.properties.state, {
 		enum: ["todo", "shipped"],
@@ -231,8 +287,8 @@ test("projects configured mappings and status vocabularies into the type", () =>
 test("recovers vocabularies from schema enums in older generated types", () => {
 	const resources = buildTaskNotesMdbaseResources();
 	const legacy = structuredClone(resources.type);
-	delete legacy["x-tasknotes"].status.values;
-	delete legacy["x-tasknotes"].priority.values;
+	delete binding(legacy).status.values;
+	delete binding(legacy).priority.values;
 	const config = resolveTaskNotesModelConfigFromMdbaseType(legacy);
 
 	assert.deepEqual(config.statuses.map(({ value }) => value), [
@@ -365,7 +421,7 @@ test("projects and resolves the complete portable TaskNotes settings snapshot", 
 			occurrenceTemplatePath: "Templates/Occurrence.md",
 		},
 	});
-	const extension = resources.type["x-tasknotes"];
+	const extension = binding(resources.type);
 	const resolved = resolveTaskNotesModelConfigFromMdbaseType(resources.type);
 
 	assert.deepEqual(resources.type.match, { where: { isTask: { eq: true } } });
@@ -437,6 +493,11 @@ test("emits a disclosed coercion-compatible schema for migrated v0.2 collections
 	assert.deepEqual(resources.type["x-legacy-v0.2"], {
 		coercion_compatible_schema: true,
 	});
-	assert.equal(resources.type["x-tasknotes"].generator.legacy_compatibility, true);
-	assert.ok(resources.type["x-tasknotes"].generator.managed_fields.includes("title"));
+	assert.equal(
+		resources.type["x-tasknotes-generator"].legacy_compatibility,
+		true
+	);
+	assert.ok(
+		resources.type["x-tasknotes-generator"].managed_fields.includes("title")
+	);
 });
