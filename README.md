@@ -19,7 +19,7 @@ It intentionally contains no Obsidian API usage, no vault IO, no process exits, 
 - host-independent operation plans for common task mutations
 - spec-normalized adapter helpers for CLI and mdbase-style consumers
 - tasknotes-spec conformance operation helpers
-- mdbase runtime provider, contract, event, dispatch, preflight, and host API types
+- canonical mdbase record and event contract artifacts
 
 Hosts own:
 
@@ -50,7 +50,6 @@ The package exports both the root module and focused subpath modules:
 | `@tasknotes/model/frontmatter` | Markdown task document parse/serialize helpers |
 | `@tasknotes/model/mdbase` | Canonical mdbase v0.3 config, contract, schema, and implementing-type generation |
 | `@tasknotes/model/conformance` | tasknotes-spec conformance operation dispatcher |
-| `@tasknotes/model/runtime` | Host-independent mdbase runtime provider and host contracts |
 
 ## Examples
 

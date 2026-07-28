@@ -11,4 +11,3 @@ export * from "./operations";
 export * from "./frontmatter";
 export * from "./mdbase";
 export * from "./conformance";
-export * from "./runtime";
