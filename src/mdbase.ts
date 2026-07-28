@@ -2,6 +2,7 @@ import YAML from "yaml";
 import { resolveModelConfig } from "./config";
 import {
 	TASKNOTES_TASK_BINDING_SCHEMA,
+	TASKNOTES_TASK_COMPLETED_EVENT_SCHEMA,
 	TASKNOTES_TASK_SCHEMA,
 } from "./generated/tasknotes-data-contract";
 import { TASKNOTES_SPEC_VERSION } from "./types";
@@ -14,6 +15,22 @@ import type {
 } from "./types";
 
 export const MDBASE_SPEC_VERSION = "0.3.0";
+export const TASKNOTES_TASK_CONTRACT_VERSION = TASKNOTES_SPEC_VERSION;
+export const TASKNOTES_TASK_COMPLETED_EVENT_VERSION = "1.0.0";
+
+export const TASKNOTES_TASK_COMPLETED_EVENT_CONTRACT = {
+	kind: "mdbase.contract",
+	contract_type: "event",
+	id: "tasknotes.task.completed",
+	version: TASKNOTES_TASK_COMPLETED_EVENT_VERSION,
+	name: "TaskNotes task completed",
+	description:
+		"A TaskNotes task moved from a non-completed status to a completed status.",
+	data_schema: {
+		dialect: "json-schema-2020-12",
+		value: TASKNOTES_TASK_COMPLETED_EVENT_SCHEMA,
+	},
+} as const;
 
 export const DEFAULT_TASKNOTES_MDBASE_PROFILES = [
 	"core-lite",
@@ -727,11 +744,12 @@ export function buildTaskNotesMdbaseResources(
 	) as Record<string, unknown>;
 	const contract: Record<string, unknown> = {
 		kind: "mdbase.contract",
+		contract_type: "record",
 		id: "tasknotes.task",
 		version: TASKNOTES_SPEC_VERSION,
 		name: "TaskNotes task",
 		description: `Portable task data and behavior defined by tasknotes-spec ${TASKNOTES_SPEC_VERSION}.`,
-		schema: {
+		record_schema: {
 			dialect: "json-schema-2020-12",
 			ref: relativeResourceReference(
 				`${contractsFolder}/tasknotes.task.md`,
