@@ -198,7 +198,7 @@ The package build emits ESM, CommonJS, and TypeScript declaration output under `
 The conformance adapter reports its claimed TaskNotes profile and implements
 the official `core-lite` operation surface. Its fixture run currently passes
 4,974 cases with zero failures; the extended-profile fixture remains outside
-that claim. The mdbase generator emits the `tasknotes.task 0.2.0` contract,
+that claim. The mdbase generator emits the `tasknotes.task 0.3.0-rc.1` record contract,
 its two JSON Schemas, and a type whose `implements` entry contains field
 mappings and TaskNotes behavior. Round-trip tests resolve those resources back
 into model configuration so filesystem-backed hosts can treat the type as a

@@ -5,7 +5,7 @@ export const TASKNOTES_TASK_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task.schema.json",
 	"title": "TaskNotes portable task view",
-	"description": "The storage-neutral record view exposed by the tasknotes.task 0.2.0 data contract.",
+	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.1 record contract.",
 	"type": "object",
 	"required": [
 		"status",
@@ -174,7 +174,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task-binding.schema.json",
 	"title": "TaskNotes task data-contract binding",
-	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.2.0.",
+	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.1.",
 	"type": "object",
 	"required": [
 		"profiles",
@@ -639,6 +639,48 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 				}
 			},
 			"additionalProperties": false
+		}
+	}
+} as const;
+
+export const TASKNOTES_TASK_COMPLETED_EVENT_SCHEMA = {
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://tasknotes.dev/schemas/tasknotes-task-completed.schema.json",
+	"title": "TaskNotes task-completed event data",
+	"description": "The minimal portable signal emitted when a task enters a completed status.",
+	"type": "object",
+	"required": [
+		"task_id",
+		"task_path",
+		"title",
+		"status",
+		"completed_at"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"task_id": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Stable task identity when available, otherwise the normalized task path."
+		},
+		"task_path": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Normalized vault-relative task path at the time of the transition."
+		},
+		"title": {
+			"type": "string",
+			"minLength": 1
+		},
+		"status": {
+			"type": "string",
+			"minLength": 1,
+			"description": "The completed status entered by the task."
+		},
+		"completed_at": {
+			"type": "string",
+			"format": "date-time",
+			"description": "When TaskNotes observed the completion transition."
 		}
 	}
 } as const;
