@@ -1,4 +1,4 @@
-import { formatDateForStorage, getDatePart, parseDateToUTC, validateDateString } from "./date";
+import { formatDateForStorage, getDatePart, getTodayString, parseDateToUTC, validateDateString } from "./date";
 import { isCompletedStatus } from "./config";
 import {
 	addDTSTARTToRecurrenceRule,
@@ -727,9 +727,8 @@ export function buildMaterializedOccurrenceCompletePlan({
 	if (!parentTask.recurrence) throw new Error("occurrence_parent_not_recurring");
 
 	const isCompletionAnchor = (parentTask.recurrence_anchor || "scheduled") === "completion";
-	const anchorDateStr = isCompletionAnchor
-		? formatDateForStorage(getRecurringTaskActionDate(parentTask, completionDate))
-		: dateStr;
+	const completionDateStr = completionDate ? formatDateForStorage(completionDate) : getTodayString();
+	const anchorDateStr = isCompletionAnchor ? completionDateStr : dateStr;
 
 	const parentCompleteInstances = appendUnique(getStringArray(parentTask.complete_instances), anchorDateStr);
 	const parentSkippedInstances = getStringArray(parentTask.skipped_instances).filter((date) => date !== dateStr);
@@ -744,7 +743,7 @@ export function buildMaterializedOccurrenceCompletePlan({
 	});
 	const occurrenceUpdates: Partial<TaskInfo> = {
 		status: completedStatus,
-		completedDate: dateStr,
+		completedDate: completionDateStr,
 		dateModified: currentTimestamp,
 	};
 	const updatedParentTask = { ...parentTask, ...parentUpdates };
