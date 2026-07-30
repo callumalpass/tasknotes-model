@@ -5,6 +5,7 @@ import {
 	completeRecurringTask,
 	getRecurringTaskActionDate,
 	isDueByRRule,
+	parseDtstartFromRecurrence,
 	recalculateRecurringSchedule,
 	updateDTSTARTInRecurrenceRule,
 	updateToNextScheduledOccurrence,
@@ -110,6 +111,7 @@ export interface BuildMaterializedOccurrenceCompletePlanInput {
 	completedStatus: string;
 	currentTimestamp: string;
 	targetDate?: string | Date;
+	completionDate?: Date;
 	maintainDueDateOffsetInRecurring: boolean;
 }
 
@@ -717,17 +719,23 @@ export function buildMaterializedOccurrenceCompletePlan({
 	completedStatus,
 	currentTimestamp,
 	targetDate,
+	completionDate,
 	maintainDueDateOffsetInRecurring,
 }: BuildMaterializedOccurrenceCompletePlanInput): MaterializedOccurrenceStatusPlan {
 	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
 	assertMaterializedOccurrence(occurrenceTask, dateStr);
 	if (!parentTask.recurrence) throw new Error("occurrence_parent_not_recurring");
 
-	const parentCompleteInstances = appendUnique(getStringArray(parentTask.complete_instances), dateStr);
+	const isCompletionAnchor = (parentTask.recurrence_anchor || "scheduled") === "completion";
+	const anchorDateStr = isCompletionAnchor
+		? formatDateForStorage(getRecurringTaskActionDate(parentTask, completionDate))
+		: dateStr;
+
+	const parentCompleteInstances = appendUnique(getStringArray(parentTask.complete_instances), anchorDateStr);
 	const parentSkippedInstances = getStringArray(parentTask.skipped_instances).filter((date) => date !== dateStr);
 	const parentUpdates = buildRecurringParentProgressionUpdates({
 		parentTask,
-		targetDate: dateStr,
+		targetDate: anchorDateStr,
 		completeInstances: parentCompleteInstances,
 		skippedInstances: parentSkippedInstances,
 		currentTimestamp,
@@ -770,8 +778,20 @@ export function buildMaterializedOccurrenceUncompletePlan({
 }: BuildMaterializedOccurrenceUncompletePlanInput): MaterializedOccurrenceStatusPlan {
 	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
 	assertMaterializedOccurrence(occurrenceTask, dateStr);
+	const isCompletionAnchor = (parentTask.recurrence_anchor || "scheduled") === "completion";
+	const anchorDtstart =
+		isCompletionAnchor && typeof parentTask.recurrence === "string"
+			? parseDtstartFromRecurrence(parentTask.recurrence)
+			: null;
+	const removalKeys = new Set(
+		[dateStr, anchorDtstart ? formatDateForStorage(anchorDtstart) : null].filter(
+			(value): value is string => !!value
+		)
+	);
 	const parentUpdates: Partial<TaskInfo> = {
-		complete_instances: getStringArray(parentTask.complete_instances).filter((date) => date !== dateStr),
+		complete_instances: getStringArray(parentTask.complete_instances).filter(
+			(date) => !removalKeys.has(date)
+		),
 		dateModified: currentTimestamp,
 	};
 	const occurrenceUpdates: Partial<TaskInfo> = {

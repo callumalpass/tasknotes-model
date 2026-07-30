@@ -324,9 +324,6 @@ test("advances recurrence anchor to the real completion date, not the occurrence
 		completedStatus: "done",
 		currentTimestamp: "2026-07-30T08:00:00Z",
 		maintainDueDateOffsetInRecurring: true,
-		// Not yet a real field on BuildMaterializedOccurrenceCompletePlanInput - this is the
-		// input shape the follow-up fix is expected to add. Today it's silently ignored,
-		// which is exactly why this test fails against current behavior.
 		completionDate: new Date(Date.UTC(2026, 6, 30)),
 	});
 
@@ -339,6 +336,17 @@ test("advances recurrence anchor to the real completion date, not the occurrence
 	// occurrence_date (2026-07-28).
 	assert.equal(plan.updatedParentTask.recurrence, "DTSTART:20260730;FREQ=WEEKLY");
 	assert.equal(plan.updatedParentTask.scheduled, "2026-08-06");
+
+	const uncomplete = buildMaterializedOccurrenceUncompletePlan({
+		occurrenceTask: plan.updatedOccurrenceTask,
+		parentTask: plan.updatedParentTask,
+		activeStatus: "open",
+		currentTimestamp: "2026-07-30T09:00:00Z",
+	});
+
+	// The completion-date-keyed entry must actually be removable on uncomplete, not left
+	// stale because uncomplete was still looking for the occurrence identity date.
+	assert.deepEqual(uncomplete.updatedParentTask.complete_instances, []);
 });
 
 test("plans time tracking and total reporting", () => {
