@@ -273,6 +273,52 @@ test("reconciles materialized occurrence completion with parent instances", () =
 	assert.equal(uncomplete.updatedParentTask.scheduled, "2026-06-02");
 });
 
+test("advances recurrence anchor to the real completion date, not the occurrence identity date", () => {
+	const parent = {
+		title: "Weekly task",
+		status: "open",
+		priority: "normal",
+		path: "Tasks/Task2.md",
+		archived: false,
+		recurrence: "DTSTART:20260727;FREQ=WEEKLY",
+		recurrence_anchor: "completion",
+		scheduled: "2026-07-27",
+		occurrence_materialization: "on_completion",
+	};
+	const occurrence = {
+		title: "Weekly task",
+		status: "open",
+		priority: "normal",
+		path: "Tasks/Task2 2026-07-28.md",
+		archived: false,
+		recurrence_parent: "[[Task2]]",
+		occurrence_date: "2026-07-28",
+		scheduled: "2026-07-29",
+	};
+
+	const plan = buildMaterializedOccurrenceCompletePlan({
+		occurrenceTask: occurrence,
+		parentTask: parent,
+		completedStatus: "done",
+		currentTimestamp: "2026-07-30T08:00:00Z",
+		maintainDueDateOffsetInRecurring: true,
+		// Not yet a real field on BuildMaterializedOccurrenceCompletePlanInput - this is the
+		// input shape the follow-up fix is expected to add. Today it's silently ignored,
+		// which is exactly why this test fails against current behavior.
+		completionDate: new Date(Date.UTC(2026, 6, 30)),
+	});
+
+	// Under completion anchoring, complete_instances should record the actual completion
+	// date (2026-07-30) - matching how buildRecurringTaskCompletePlan already behaves for
+	// non-materialized tasks - not the occurrence identity date (2026-07-28).
+	assert.deepEqual(plan.updatedParentTask.complete_instances, ["2026-07-30"]);
+
+	// Anchor/progression must be tied to the actual completion date (2026-07-30), not
+	// occurrence_date (2026-07-28).
+	assert.equal(plan.updatedParentTask.recurrence, "DTSTART:20260730;FREQ=WEEKLY");
+	assert.equal(plan.updatedParentTask.scheduled, "2026-08-06");
+});
+
 test("plans time tracking and total reporting", () => {
 	const start = buildStartTimeTrackingPlan(
 		{
