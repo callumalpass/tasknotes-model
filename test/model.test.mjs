@@ -302,51 +302,106 @@ test("advances recurrence anchor to the real completion date, not the occurrence
 		priority: "normal",
 		path: "Tasks/Task2.md",
 		archived: false,
-		recurrence: "DTSTART:20260727;FREQ=WEEKLY",
+		recurrence: "DTSTART:20260101;FREQ=WEEKLY",
 		recurrence_anchor: "completion",
-		scheduled: "2026-07-27",
+		scheduled: "2026-01-01",
 		occurrence_materialization: "on_completion",
 	};
 	const occurrence = {
 		title: "Weekly task",
 		status: "open",
 		priority: "normal",
-		path: "Tasks/Task2 2026-07-28.md",
+		path: "Tasks/Task2 2026-01-02.md",
 		archived: false,
 		recurrence_parent: "[[Task2]]",
-		occurrence_date: "2026-07-28",
-		scheduled: "2026-07-29",
+		occurrence_date: "2026-01-02",
+		scheduled: "2026-01-03",
 	};
 
 	const plan = buildMaterializedOccurrenceCompletePlan({
 		occurrenceTask: occurrence,
 		parentTask: parent,
 		completedStatus: "done",
-		currentTimestamp: "2026-07-30T08:00:00Z",
+		currentTimestamp: "2026-01-04T08:00:00Z",
 		maintainDueDateOffsetInRecurring: true,
-		completionDate: new Date(Date.UTC(2026, 6, 30)),
+		completionDate: new Date(Date.UTC(2026, 0, 4)),
 	});
 
 	// Under completion anchoring, complete_instances should record the actual completion
-	// date (2026-07-30) - matching how buildRecurringTaskCompletePlan already behaves for
-	// non-materialized tasks - not the occurrence identity date (2026-07-28).
-	assert.deepEqual(plan.updatedParentTask.complete_instances, ["2026-07-30"]);
+	// date (2026-01-04) - matching how buildRecurringTaskCompletePlan already behaves for
+	// non-materialized tasks - not the occurrence identity date (2026-01-02).
+	assert.deepEqual(plan.updatedParentTask.complete_instances, ["2026-01-04"]);
 
-	// Anchor/progression must be tied to the actual completion date (2026-07-30), not
-	// occurrence_date (2026-07-28).
-	assert.equal(plan.updatedParentTask.recurrence, "DTSTART:20260730;FREQ=WEEKLY");
-	assert.equal(plan.updatedParentTask.scheduled, "2026-08-06");
+	// Anchor/progression must be tied to the actual completion date (2026-01-04), not
+	// occurrence_date (2026-01-02).
+	assert.equal(plan.updatedParentTask.recurrence, "DTSTART:20260104;FREQ=WEEKLY");
+	assert.equal(plan.updatedParentTask.scheduled, "2026-01-11");
 
 	const uncomplete = buildMaterializedOccurrenceUncompletePlan({
 		occurrenceTask: plan.updatedOccurrenceTask,
 		parentTask: plan.updatedParentTask,
 		activeStatus: "open",
-		currentTimestamp: "2026-07-30T09:00:00Z",
+		currentTimestamp: "2026-01-04T09:00:00Z",
 	});
 
 	// The completion-date-keyed entry must actually be removable on uncomplete, not left
 	// stale because uncomplete was still looking for the occurrence identity date.
 	assert.deepEqual(uncomplete.updatedParentTask.complete_instances, []);
+});
+
+test("advances recurrence anchor when the parent already has prior completion-anchored instances", () => {
+	const parent = {
+		title: "Weekly task",
+		status: "open",
+		priority: "normal",
+		path: "Tasks/Task2.md",
+		archived: false,
+		// DTSTART reflects the last time this was completed (2025-12-25); the two
+		// entries below are the completion dates of the two cycles before that.
+		recurrence: "DTSTART:20251225;FREQ=WEEKLY",
+		recurrence_anchor: "completion",
+		scheduled: "2026-01-01",
+		complete_instances: ["2025-12-18", "2025-12-25"],
+		occurrence_materialization: "on_completion",
+	};
+	const occurrence = {
+		title: "Weekly task",
+		status: "open",
+		priority: "normal",
+		path: "Tasks/Task2 2026-01-02.md",
+		archived: false,
+		recurrence_parent: "[[Task2]]",
+		occurrence_date: "2026-01-02",
+		scheduled: "2026-01-03",
+	};
+
+	const plan = buildMaterializedOccurrenceCompletePlan({
+		occurrenceTask: occurrence,
+		parentTask: parent,
+		completedStatus: "done",
+		currentTimestamp: "2026-01-08T08:00:00Z",
+		maintainDueDateOffsetInRecurring: true,
+		completionDate: new Date(Date.UTC(2026, 0, 8)),
+	});
+
+	// The new completion date is appended; the earlier cycles are untouched.
+	assert.deepEqual(plan.updatedParentTask.complete_instances, [
+		"2025-12-18",
+		"2025-12-25",
+		"2026-01-08",
+	]);
+	assert.equal(plan.updatedParentTask.recurrence, "DTSTART:20260108;FREQ=WEEKLY");
+	assert.equal(plan.updatedParentTask.scheduled, "2026-01-15");
+
+	const uncomplete = buildMaterializedOccurrenceUncompletePlan({
+		occurrenceTask: plan.updatedOccurrenceTask,
+		parentTask: plan.updatedParentTask,
+		activeStatus: "open",
+		currentTimestamp: "2026-01-08T09:00:00Z",
+	});
+
+	// Only the just-completed instance is removed - the earlier history survives.
+	assert.deepEqual(uncomplete.updatedParentTask.complete_instances, ["2025-12-18", "2025-12-25"]);
 });
 
 test("plans time tracking and total reporting", () => {
