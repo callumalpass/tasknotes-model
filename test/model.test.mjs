@@ -252,6 +252,7 @@ test("reconciles materialized occurrence completion with parent instances", () =
 		completedStatus: "done",
 		currentTimestamp: "2026-06-01T12:00:00Z",
 		maintainDueDateOffsetInRecurring: true,
+		completionDate: new Date(Date.UTC(2026, 5, 1)),
 	});
 
 	assert.equal(plan.updatedOccurrenceTask.status, "done");
@@ -304,6 +305,10 @@ test("advances recurrence anchor to the real completion date, not the occurrence
 		maintainDueDateOffsetInRecurring: true,
 		completionDate: new Date(Date.UTC(2026, 0, 4)),
 	});
+
+	// The occurrence's own completedDate must be the real completion date (2026-01-04),
+	// not the occurrence identity date (2026-01-02).
+	assert.equal(plan.updatedOccurrenceTask.completedDate, "2026-01-04");
 
 	// Under completion anchoring, complete_instances should record the actual completion
 	// date (2026-01-04) - matching how buildRecurringTaskCompletePlan already behaves for
@@ -361,6 +366,9 @@ test("advances recurrence anchor when the parent already has prior completion-an
 		maintainDueDateOffsetInRecurring: true,
 		completionDate: new Date(Date.UTC(2026, 0, 8)),
 	});
+
+	// The occurrence's own completedDate is the real completion date, not occurrence_date.
+	assert.equal(plan.updatedOccurrenceTask.completedDate, "2026-01-08");
 
 	// The new completion date is appended; the earlier cycles are untouched.
 	assert.deepEqual(plan.updatedParentTask.complete_instances, [
