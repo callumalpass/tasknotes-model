@@ -52,6 +52,16 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	]);
 	assert.equal(taskImplementation.fields.completedDate, "completedDate");
 	assert.equal(taskImplementation.fields.id, "id");
+	const taskDateSchema = {
+		anyOf: [
+			{ type: "string", format: "date" },
+			{ type: "string", format: "date-time" },
+		],
+	};
+	assert.deepEqual(schema.properties.due, taskDateSchema);
+	assert.deepEqual(schema.properties.scheduled, taskDateSchema);
+	assert.deepEqual(resources.taskSchema.properties.due, taskDateSchema);
+	assert.deepEqual(resources.taskSchema.properties.scheduled, taskDateSchema);
 	assert.deepEqual(type.collection.unique, [{ field: "id", scope: "type" }]);
 	assert.deepEqual(type.lifecycle.on_create.set.id, { uuid: true });
 	assert.deepEqual(schema.properties.completedDate, { type: "string", format: "date" });

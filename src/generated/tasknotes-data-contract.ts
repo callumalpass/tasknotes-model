@@ -30,12 +30,28 @@ export const TASKNOTES_TASK_SCHEMA = {
 			"minLength": 1
 		},
 		"due": {
-			"type": "string",
-			"format": "date"
+			"anyOf": [
+				{
+					"type": "string",
+					"format": "date"
+				},
+				{
+					"type": "string",
+					"format": "date-time"
+				}
+			]
 		},
 		"scheduled": {
-			"type": "string",
-			"format": "date"
+			"anyOf": [
+				{
+					"type": "string",
+					"format": "date"
+				},
+				{
+					"type": "string",
+					"format": "date-time"
+				}
+			]
 		},
 		"contexts": {
 			"type": "array",

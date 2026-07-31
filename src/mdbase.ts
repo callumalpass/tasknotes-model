@@ -461,8 +461,8 @@ export function buildTaskNotesMdbaseResources(
 	addField("priority", mapping.priority, { enum: priorityValues }, {
 		defaultValue: modelConfig.defaults.priority,
 	});
-	addField("due", mapping.due, dateSchema(legacyCompatibility));
-	addField("scheduled", mapping.scheduled, dateSchema(legacyCompatibility));
+	addField("due", mapping.due, taskDateSchema(legacyCompatibility));
+	addField("scheduled", mapping.scheduled, taskDateSchema(legacyCompatibility));
 	addField("contexts", mapping.contexts, arraySchema(stringSchema({}, legacyCompatibility), legacyCompatibility));
 	addField(
 		"projects",
@@ -1245,6 +1245,15 @@ function booleanSchema(legacyCompatibility: boolean): Record<string, unknown> {
 
 function dateSchema(_legacyCompatibility: boolean): Record<string, unknown> {
 	return { type: "string", format: "date" };
+}
+
+function taskDateSchema(legacyCompatibility: boolean): Record<string, unknown> {
+	return {
+		anyOf: [
+			dateSchema(legacyCompatibility),
+			dateTimeSchema(legacyCompatibility),
+		],
+	};
 }
 
 function dateTimeSchema(legacyCompatibility: boolean): Record<string, unknown> {
