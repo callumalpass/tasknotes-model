@@ -1,11 +1,10 @@
-import { formatDateForStorage, getDatePart, getTodayString, parseDateToUTC, validateDateString } from "./date";
+import { formatDateForStorage, getDatePart, parseDateToUTC, validateDateString } from "./date";
 import { isCompletedStatus } from "./config";
 import {
 	addDTSTARTToRecurrenceRule,
 	completeRecurringTask,
 	getRecurringTaskActionDate,
 	isDueByRRule,
-	parseDtstartFromRecurrence,
 	recalculateRecurringSchedule,
 	updateDTSTARTInRecurrenceRule,
 	updateToNextScheduledOccurrence,
@@ -111,7 +110,7 @@ export interface BuildMaterializedOccurrenceCompletePlanInput {
 	completedStatus: string;
 	currentTimestamp: string;
 	targetDate?: string | Date;
-	completionDate?: Date;
+	completionDate?: string | Date;
 	maintainDueDateOffsetInRecurring: boolean;
 }
 
@@ -726,15 +725,23 @@ export function buildMaterializedOccurrenceCompletePlan({
 	assertMaterializedOccurrence(occurrenceTask, dateStr);
 	if (!parentTask.recurrence) throw new Error("occurrence_parent_not_recurring");
 
-	const isCompletionAnchor = (parentTask.recurrence_anchor || "scheduled") === "completion";
-	const completionDateStr = completionDate ? formatDateForStorage(completionDate) : getTodayString();
-	const anchorDateStr = isCompletionAnchor ? completionDateStr : dateStr;
+	const completionDateStr =
+		completionDate === undefined ? dateStr : normalizeOccurrenceTargetDate(completionDate);
+	const progressionDate =
+		(parentTask.recurrence_anchor || "scheduled") === "completion"
+			? completionDateStr
+			: dateStr;
 
-	const parentCompleteInstances = appendUnique(getStringArray(parentTask.complete_instances), anchorDateStr);
-	const parentSkippedInstances = getStringArray(parentTask.skipped_instances).filter((date) => date !== dateStr);
+	const parentCompleteInstances = appendUnique(
+		getStringArray(parentTask.complete_instances),
+		dateStr
+	);
+	const parentSkippedInstances = getStringArray(parentTask.skipped_instances).filter(
+		(date) => date !== dateStr
+	);
 	const parentUpdates = buildRecurringParentProgressionUpdates({
 		parentTask,
-		targetDate: anchorDateStr,
+		targetDate: progressionDate,
 		completeInstances: parentCompleteInstances,
 		skippedInstances: parentSkippedInstances,
 		currentTimestamp,
@@ -777,19 +784,9 @@ export function buildMaterializedOccurrenceUncompletePlan({
 }: BuildMaterializedOccurrenceUncompletePlanInput): MaterializedOccurrenceStatusPlan {
 	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
 	assertMaterializedOccurrence(occurrenceTask, dateStr);
-	const isCompletionAnchor = (parentTask.recurrence_anchor || "scheduled") === "completion";
-	const anchorDtstart =
-		isCompletionAnchor && typeof parentTask.recurrence === "string"
-			? parseDtstartFromRecurrence(parentTask.recurrence)
-			: null;
-	const removalKeys = new Set(
-		[dateStr, anchorDtstart ? formatDateForStorage(anchorDtstart) : null].filter(
-			(value): value is string => !!value
-		)
-	);
 	const parentUpdates: Partial<TaskInfo> = {
 		complete_instances: getStringArray(parentTask.complete_instances).filter(
-			(date) => !removalKeys.has(date)
+			(date) => date !== dateStr
 		),
 		dateModified: currentTimestamp,
 	};

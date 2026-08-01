@@ -387,7 +387,7 @@ function getRRuleDtstart(
 	);
 }
 
-export function parseDtstartFromRecurrence(recurrence: string): Date | null {
+function parseDtstartFromRecurrence(recurrence: string): Date | null {
 	const match = recurrence.match(/DTSTART:(\d{8}(?:T\d{6}Z?)?)/);
 	if (!match) return null;
 	return parseRRuleDateValue(match[1], false);
