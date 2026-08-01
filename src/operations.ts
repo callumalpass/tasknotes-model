@@ -110,6 +110,7 @@ export interface BuildMaterializedOccurrenceCompletePlanInput {
 	completedStatus: string;
 	currentTimestamp: string;
 	targetDate?: string | Date;
+	completionDate?: string | Date;
 	maintainDueDateOffsetInRecurring: boolean;
 }
 
@@ -717,17 +718,30 @@ export function buildMaterializedOccurrenceCompletePlan({
 	completedStatus,
 	currentTimestamp,
 	targetDate,
+	completionDate,
 	maintainDueDateOffsetInRecurring,
 }: BuildMaterializedOccurrenceCompletePlanInput): MaterializedOccurrenceStatusPlan {
 	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
 	assertMaterializedOccurrence(occurrenceTask, dateStr);
 	if (!parentTask.recurrence) throw new Error("occurrence_parent_not_recurring");
 
-	const parentCompleteInstances = appendUnique(getStringArray(parentTask.complete_instances), dateStr);
-	const parentSkippedInstances = getStringArray(parentTask.skipped_instances).filter((date) => date !== dateStr);
+	const completionDateStr =
+		completionDate === undefined ? dateStr : normalizeOccurrenceTargetDate(completionDate);
+	const progressionDate =
+		(parentTask.recurrence_anchor || "scheduled") === "completion"
+			? completionDateStr
+			: dateStr;
+
+	const parentCompleteInstances = appendUnique(
+		getStringArray(parentTask.complete_instances),
+		dateStr
+	);
+	const parentSkippedInstances = getStringArray(parentTask.skipped_instances).filter(
+		(date) => date !== dateStr
+	);
 	const parentUpdates = buildRecurringParentProgressionUpdates({
 		parentTask,
-		targetDate: dateStr,
+		targetDate: progressionDate,
 		completeInstances: parentCompleteInstances,
 		skippedInstances: parentSkippedInstances,
 		currentTimestamp,
@@ -736,7 +750,7 @@ export function buildMaterializedOccurrenceCompletePlan({
 	});
 	const occurrenceUpdates: Partial<TaskInfo> = {
 		status: completedStatus,
-		completedDate: dateStr,
+		completedDate: completionDateStr,
 		dateModified: currentTimestamp,
 	};
 	const updatedParentTask = { ...parentTask, ...parentUpdates };
@@ -771,7 +785,9 @@ export function buildMaterializedOccurrenceUncompletePlan({
 	const dateStr = resolveOccurrenceDateOrThrow(occurrenceTask, targetDate);
 	assertMaterializedOccurrence(occurrenceTask, dateStr);
 	const parentUpdates: Partial<TaskInfo> = {
-		complete_instances: getStringArray(parentTask.complete_instances).filter((date) => date !== dateStr),
+		complete_instances: getStringArray(parentTask.complete_instances).filter(
+			(date) => date !== dateStr
+		),
 		dateModified: currentTimestamp,
 	};
 	const occurrenceUpdates: Partial<TaskInfo> = {
