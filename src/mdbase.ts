@@ -578,7 +578,7 @@ export function buildTaskNotesMdbaseResources(
 		mapping.googleCalendarMovedOriginalDates,
 		arraySchema(dateSchema(legacyCompatibility), legacyCompatibility)
 	);
-	addField("sortOrder", mapping.sortOrder, numberSchema({}, legacyCompatibility));
+	addField("sortOrder", mapping.sortOrder, stringSchema({}, legacyCompatibility));
 
 	for (const userField of modelConfig.userFields) {
 		properties[userField.key] = userFieldSchema(userField, legacyCompatibility);
