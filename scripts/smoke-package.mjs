@@ -36,6 +36,14 @@ try {
     join(tempRoot, "cjs.cjs"),
     'const model = require("@tasknotes/model");\nif (Object.keys(model).length === 0) throw new Error("CJS export is empty");\n',
   );
+  writeFileSync(
+    join(tempRoot, "attachments.mjs"),
+    'import { canonicalAttachmentReference } from "@tasknotes/model/attachments";\nif (canonicalAttachmentReference("Attachments/image.png") !== "[[Attachments/image.png]]") throw new Error("ESM attachment export is unavailable");\n',
+  );
+  writeFileSync(
+    join(tempRoot, "attachments.cjs"),
+    'const { canonicalAttachmentReference } = require("@tasknotes/model/attachments");\nif (canonicalAttachmentReference("Attachments/image.png") !== "[[Attachments/image.png]]") throw new Error("CJS attachment export is unavailable");\n',
+  );
 
   runNpm(["install", "--ignore-scripts", tarball], {
     cwd: tempRoot,
@@ -43,6 +51,8 @@ try {
   });
   execFileSync(process.execPath, ["esm.mjs"], { cwd: tempRoot, stdio: "inherit" });
   execFileSync(process.execPath, ["cjs.cjs"], { cwd: tempRoot, stdio: "inherit" });
+  execFileSync(process.execPath, ["attachments.mjs"], { cwd: tempRoot, stdio: "inherit" });
+  execFileSync(process.execPath, ["attachments.cjs"], { cwd: tempRoot, stdio: "inherit" });
 } finally {
   if (tarball) rmSync(tarball, { force: true });
   rmSync(tempRoot, { recursive: true, force: true });
