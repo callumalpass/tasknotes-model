@@ -957,6 +957,7 @@ export function specFrontmatterToTaskInfo(
 		tags: getStringArray(frontmatter.tags),
 		contexts: getStringArray(frontmatter.contexts),
 		projects: getStringArray(frontmatter.projects),
+		attachments: getStringArray(frontmatter.attachments),
 		timeEstimate:
 			typeof frontmatter.timeEstimate === "number" ? frontmatter.timeEstimate : undefined,
 		blockedBy: normalizeBlockedByValue(frontmatter.blockedBy),
@@ -991,6 +992,7 @@ export function taskInfoToSpecFields(task: Partial<TaskInfo>): Record<string, un
 	writeIfDefined(fields, "tags", task.tags);
 	writeIfDefined(fields, "contexts", task.contexts);
 	writeIfDefined(fields, "projects", task.projects);
+	writeIfDefined(fields, "attachments", task.attachments);
 	writeIfDefined(fields, "timeEstimate", task.timeEstimate);
 	writeIfDefined(fields, "blockedBy", task.blockedBy);
 	writeIfDefined(fields, "reminders", task.reminders);
@@ -1246,6 +1248,9 @@ function applySpecFieldsToTaskInfo(task: TaskInfo, fields: Record<string, unknow
 	if (Object.prototype.hasOwnProperty.call(fields, "timeEntries")) {
 		updatedTask.timeEntries = sanitizeTimeEntries(fields.timeEntries as TimeEntry[] | undefined);
 	}
+	if (Object.prototype.hasOwnProperty.call(fields, "attachments")) {
+		updatedTask.attachments = getStringArray(fields.attachments);
+	}
 	return updatedTask;
 }
 
@@ -1281,6 +1286,11 @@ function addUnsetMappedFieldDeletes(
 			patch.push({ op: "delete", field: fieldMapping.projects });
 		}
 	}
+	if (Object.prototype.hasOwnProperty.call(updates, "attachments")) {
+		if (!Array.isArray(updates.attachments) || updates.attachments.length === 0) {
+			patch.push({ op: "delete", field: fieldMapping.attachments });
+		}
+	}
 	if (
 		Object.prototype.hasOwnProperty.call(updates, "googleCalendarMovedOriginalDates") &&
 		(!Array.isArray(updates.googleCalendarMovedOriginalDates) ||
@@ -1299,6 +1309,7 @@ function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof Ta
 		scheduled: "scheduled",
 		contexts: "contexts",
 		projects: "projects",
+		attachments: "attachments",
 		timeEstimate: "timeEstimate",
 		completedDate: "completedDate",
 		dateCreated: "dateCreated",
@@ -1371,6 +1382,7 @@ function buildInheritedOccurrenceTask(parentTask: TaskInfo, targetDate: string):
 		scheduled,
 		contexts: cloneArray(parentTask.contexts),
 		projects: cloneArray(parentTask.projects),
+		attachments: cloneArray(parentTask.attachments),
 		tags: cloneArray(parentTask.tags),
 		timeEstimate: parentTask.timeEstimate,
 		reminders: cloneObjectArray(parentTask.reminders),

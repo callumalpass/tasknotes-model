@@ -1,4 +1,5 @@
 import { DEFAULT_FIELD_MAPPING, DEFAULT_PRIORITIES, DEFAULT_STATUSES } from "./defaults";
+import { normalizeAttachmentList } from "./attachments";
 import { validateCompleteInstances } from "./date";
 import type {
 	FieldMapping,
@@ -123,6 +124,9 @@ export function mapTaskFromFrontmatter(
 	}
 	if (frontmatter[mapping.projects] !== undefined) {
 		mapped.projects = normalizeStringArrayValue(frontmatter[mapping.projects]);
+	}
+	if (frontmatter[mapping.attachments] !== undefined) {
+		mapped.attachments = normalizeAttachmentList(frontmatter[mapping.attachments]);
 	}
 	if (frontmatter[mapping.timeEstimate] !== undefined) {
 		mapped.timeEstimate = normalizeNumberValue(frontmatter[mapping.timeEstimate]);
@@ -263,6 +267,9 @@ export function mapTaskToFrontmatter(
 	}
 	if (taskData.projects !== undefined && (!Array.isArray(taskData.projects) || taskData.projects.length > 0)) {
 		frontmatter[mapping.projects] = taskData.projects;
+	}
+	if (taskData.attachments !== undefined && taskData.attachments.length > 0) {
+		frontmatter[mapping.attachments] = taskData.attachments;
 	}
 	if (taskData.timeEstimate !== undefined) frontmatter[mapping.timeEstimate] = taskData.timeEstimate;
 	if (taskData.completedDate !== undefined) frontmatter[mapping.completedDate] = taskData.completedDate;

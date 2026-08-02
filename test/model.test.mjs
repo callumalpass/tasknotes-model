@@ -12,16 +12,20 @@ import {
 	buildSpecStopTimeTrackingUpdate,
 	buildStartTimeTrackingPlan,
 	buildTaskUpdatePlan,
+	canonicalAttachmentReference,
 	calculateTotalTrackedMinutes,
 	executeConformanceOperation,
 	formatDateForStorage,
 	getDatePart,
 	mapTaskFromFrontmatter,
 	mapTaskToFrontmatter,
+	attachmentPathFromReference,
 	parseDateToUTC,
 	parseTaskDocument,
 	recalculateRecurringSchedule,
 	serializeTaskDocument,
+	validateAttachmentReferences,
+	validateTask,
 } from "../dist/esm/index.js";
 
 test("maps TaskNotes frontmatter to normalized task data", () => {
@@ -37,6 +41,7 @@ test("maps TaskNotes frontmatter to normalized task data", () => {
 			recurrence_parent: "[[Tasks/Daily task]]",
 			occurrence_date: "2026-06-01",
 			occurrence_materialization: "on_completion",
+			attachments: "[[Attachments/receipt.jpg]]",
 		},
 		"Tasks/Ship model.md",
 		false,
@@ -62,6 +67,7 @@ test("maps TaskNotes frontmatter to normalized task data", () => {
 	assert.equal(task.recurrence_parent, "[[Tasks/Daily task]]");
 	assert.equal(task.occurrence_date, "2026-06-01");
 	assert.equal(task.occurrence_materialization, "on_completion");
+	assert.deepEqual(task.attachments, ["[[Attachments/receipt.jpg]]"]);
 });
 
 test("denormalizes task data to configured frontmatter", () => {
@@ -75,6 +81,7 @@ test("denormalizes task data to configured frontmatter", () => {
 		recurrence_parent: "[[Tasks/Daily task]]",
 		occurrence_date: "2026-06-01",
 		occurrence_next_trigger: "completion_or_skip",
+		attachments: ["[[Attachments/receipt.jpg]]", "[[Attachments/photo.png]]"],
 	});
 
 	assert.equal(frontmatter.title, "Ship model");
@@ -83,6 +90,50 @@ test("denormalizes task data to configured frontmatter", () => {
 	assert.equal(frontmatter.recurrence_parent, "[[Tasks/Daily task]]");
 	assert.equal(frontmatter.occurrence_date, "2026-06-01");
 	assert.equal(frontmatter.occurrence_next_trigger, "completion_or_skip");
+	assert.deepEqual(frontmatter.attachments, [
+		"[[Attachments/receipt.jpg]]",
+		"[[Attachments/photo.png]]",
+	]);
+});
+
+test("canonicalizes and validates portable attachment references", () => {
+	assert.equal(
+		attachmentPathFromReference("[Receipt](Attachments/receipt%20copy.jpg)"),
+		"Attachments/receipt copy.jpg"
+	);
+	assert.equal(
+		attachmentPathFromReference("[Receipt](../Attachments/receipt.jpg)", "Tasks/today.md"),
+		"Attachments/receipt.jpg"
+	);
+	assert.equal(
+		attachmentPathFromReference("[[Attachments/receipt.jpg]]", "Tasks/today.md"),
+		"Attachments/receipt.jpg"
+	);
+	assert.equal(
+		canonicalAttachmentReference("Attachments/receipt.jpg"),
+		"[[Attachments/receipt.jpg]]"
+	);
+	assert.equal(attachmentPathFromReference("../../secret.jpg"), undefined);
+	assert.equal(attachmentPathFromReference("[[Attachments/no-extension]]"), undefined);
+
+	const validation = validateAttachmentReferences([
+		"[[Attachments/receipt.jpg]]",
+		"Attachments/receipt.jpg",
+		"[[Attachments/no-extension]]",
+	]);
+	assert.equal(validation.valid, false);
+	assert.deepEqual(
+		validation.issues.map(({ code }) => code),
+		["duplicate_attachment_reference", "invalid_attachment_reference"]
+	);
+
+	const taskValidation = validateTask({
+		attachments: ["[[Attachments/no-extension]]"],
+	});
+	assert.equal(taskValidation.valid, false);
+	assert.ok(
+		taskValidation.issues.some(({ code }) => code === "invalid_attachment_reference")
+	);
 });
 
 test("parses dates with UTC storage semantics", () => {
@@ -200,6 +251,7 @@ test("materialized occurrences inherit planning fields but not parent history", 
 		due: "2026-06-02T11:00:00",
 		contexts: ["office"],
 		projects: ["[[Projects/Launch]]"],
+		attachments: ["[[Attachments/brief.png]]"],
 		tags: ["task", "review"],
 		timeEstimate: 45,
 		timeEntries: [{ startTime: "2026-06-01T09:30:00Z", endTime: "2026-06-01T10:00:00Z" }],
@@ -230,6 +282,7 @@ test("materialized occurrences inherit planning fields but not parent history", 
 	assert.equal(occurrence.due, "2026-06-09T11:00:00");
 	assert.deepEqual(occurrence.contexts, ["office"]);
 	assert.deepEqual(occurrence.projects, ["[[Projects/Launch]]"]);
+	assert.deepEqual(occurrence.attachments, ["[[Attachments/brief.png]]"]);
 	assert.deepEqual(occurrence.tags, ["task", "review"]);
 	assert.equal(occurrence.timeEstimate, 45);
 	assert.deepEqual(occurrence.reminders, parent.reminders);

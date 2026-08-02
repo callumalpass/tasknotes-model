@@ -2,6 +2,7 @@ export * from "./types";
 export * from "./defaults";
 export * from "./config";
 export * from "./date";
+export * from "./attachments";
 export * from "./mapping";
 export * from "./schema";
 export * from "./recurrence";

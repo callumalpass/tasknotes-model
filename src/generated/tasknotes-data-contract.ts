@@ -5,7 +5,7 @@ export const TASKNOTES_TASK_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task.schema.json",
 	"title": "TaskNotes portable task view",
-	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.1 record contract.",
+	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.2 record contract.",
 	"type": "object",
 	"required": [
 		"status",
@@ -63,6 +63,14 @@ export const TASKNOTES_TASK_SCHEMA = {
 			"type": "array",
 			"items": {
 				"type": "string"
+			}
+		},
+		"attachments": {
+			"type": "array",
+			"uniqueItems": true,
+			"items": {
+				"type": "string",
+				"minLength": 1
 			}
 		},
 		"timeEstimate": {
@@ -190,7 +198,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task-binding.schema.json",
 	"title": "TaskNotes task data-contract binding",
-	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.1.",
+	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.2.",
 	"type": "object",
 	"required": [
 		"profiles",
@@ -227,6 +235,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 				"enum": [
 					"dependencies",
 					"reminders",
+					"attachments",
 					"links",
 					"time-tracking",
 					"materialized-occurrences",
