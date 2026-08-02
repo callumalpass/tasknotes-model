@@ -7,6 +7,7 @@ const entries = [
 	"defaults",
 	"config",
 	"date",
+	"attachments",
 	"mapping",
 	"schema",
 	"recurrence",
