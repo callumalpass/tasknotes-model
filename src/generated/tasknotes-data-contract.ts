@@ -5,7 +5,7 @@ export const TASKNOTES_TASK_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task.schema.json",
 	"title": "TaskNotes portable task view",
-	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.2 record contract.",
+	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.3 record contract.",
 	"type": "object",
 	"required": [
 		"status",
@@ -189,7 +189,7 @@ export const TASKNOTES_TASK_SCHEMA = {
 			}
 		},
 		"sortOrder": {
-			"type": "number"
+			"type": "string"
 		}
 	}
 } as const;
@@ -198,7 +198,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task-binding.schema.json",
 	"title": "TaskNotes task data-contract binding",
-	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.2.",
+	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.3.",
 	"type": "object",
 	"required": [
 		"profiles",

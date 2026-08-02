@@ -11,7 +11,7 @@ import {
 function implementation(type) {
 	return type.implements.find(
 		(entry) =>
-			entry.contract === "tasknotes.task" && entry.version === "0.3.0-rc.2"
+			entry.contract === "tasknotes.task" && entry.version === "0.3.0-rc.3"
 	);
 }
 
@@ -30,10 +30,10 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	assert.equal(resources.config.settings.contracts_folder, "_contracts");
 	assert.equal(resources.contract.id, "tasknotes.task");
 	assert.equal(resources.contract.contract_type, "record");
-	assert.equal(resources.contract.version, "0.3.0-rc.2");
+	assert.equal(resources.contract.version, "0.3.0-rc.3");
 	assert.ok(resources.contract.record_schema);
 	assert.equal(taskImplementation.contract, "tasknotes.task");
-	assert.equal(taskImplementation.version, "0.3.0-rc.2");
+	assert.equal(taskImplementation.version, "0.3.0-rc.3");
 	assert.deepEqual(extension.profiles, [
 		"core-lite",
 		"recurrence",
@@ -58,6 +58,9 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 		type: "array",
 		items: { type: "string", minLength: 1 },
 		uniqueItems: true,
+	});
+	assert.deepEqual(schema.properties[taskImplementation.fields.sortOrder], {
+		type: "string",
 	});
 	assert.deepEqual(type.collection.links["attachments[]"], {
 		validate_exists: false,
@@ -97,7 +100,7 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	const pack = await buildTaskNotesMdbaseTypePack(resources);
 
 	assert.deepEqual(pack.provides, [
-		{ id: "tasknotes.task", version: "0.3.0-rc.2" },
+		{ id: "tasknotes.task", version: "0.3.0-rc.3" },
 	]);
 	assert.equal(pack.manifest.kind, "mdbase.type-pack");
 	assert.equal(pack.manifest.id, "tasknotes.task");
