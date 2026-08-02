@@ -11,6 +11,8 @@ It intentionally contains no Obsidian API usage, no vault IO, no process exits, 
 - TaskNotes task, config, field mapping, status, priority, recurrence, and time-entry types
 - default model configuration
 - TaskNotes frontmatter mapping and normalization
+- attachment-list normalization, safe collection-path resolution, canonical
+  references, and validation
 - date parsing, date comparison, and storage-date semantics
 - recurrence evaluation and schedule advancement
 - materialized occurrence identity, creation, completion, skip, and parent reconciliation plans
@@ -41,6 +43,7 @@ The package exports both the root module and focused subpath modules:
 | `@tasknotes/model/defaults` | Default field mapping, statuses, priorities, and model config |
 | `@tasknotes/model/config` | Model config resolution and tasknotes-spec field mapping helpers |
 | `@tasknotes/model/date` | Date parsing, validation, comparison, and storage formatting |
+| `@tasknotes/model/attachments` | Canonical attachment references plus safe collection-path normalization and validation |
 | `@tasknotes/model/mapping` | TaskNotes frontmatter mapping, dependency mapping, and value normalization |
 | `@tasknotes/model/schema` | Zod schemas for model validation |
 | `@tasknotes/model/recurrence` | Recurrence evaluation, DTSTART handling, and schedule recalculation |
@@ -70,6 +73,29 @@ const task = mapTaskFromFrontmatter(
 	false,
 	[]
 );
+```
+
+Normalize host-independent attachment membership without storing binary
+metadata in frontmatter:
+
+```ts
+import {
+	attachmentPathFromReference,
+	canonicalAttachmentReference,
+	validateAttachmentReferences,
+} from "@tasknotes/model/attachments";
+
+const reference = canonicalAttachmentReference("Attachments/receipt.jpg");
+// [[Attachments/receipt.jpg]]
+
+const path = attachmentPathFromReference(
+	"[receipt](../Attachments/receipt.jpg)",
+	"Tasks/Expense report.md"
+);
+// Attachments/receipt.jpg
+
+const validation = validateAttachmentReferences([reference]);
+// { valid: true, issues: [] }
 ```
 
 Advance a recurring task without doing any host IO:
