@@ -43,6 +43,7 @@ export const DEFAULT_TASKNOTES_MDBASE_PROFILES = [
 export const DEFAULT_TASKNOTES_MDBASE_CAPABILITIES = [
 	"dependencies",
 	"reminders",
+	"attachments",
 	"links",
 	"time-tracking",
 	"materialized-occurrences",
@@ -175,7 +176,7 @@ interface FieldOptions {
 	defaultValue?: unknown;
 	createValue?: Record<string, unknown>;
 	updateValue?: Record<string, unknown>;
-	links?: Array<{ suffix?: string; targetType: "task" | "any" }>;
+	links?: Array<{ suffix?: string; targetType?: "task" | "any" }>;
 }
 
 /**
@@ -433,7 +434,7 @@ export function buildTaskNotesMdbaseResources(
 				continue;
 			}
 			links[path] = {
-				target_type: link.targetType,
+				...(link.targetType ? { target_type: link.targetType } : {}),
 				validate_exists: false,
 			};
 		}
@@ -469,6 +470,15 @@ export function buildTaskNotesMdbaseResources(
 		mapping.projects,
 		arraySchema(stringSchema({}, legacyCompatibility), legacyCompatibility),
 		{ links: [{ suffix: "[]", targetType: "any" }] }
+	);
+	addField(
+		"attachments",
+		mapping.attachments,
+		{
+			...arraySchema(stringSchema({ minLength: 1 }, legacyCompatibility), legacyCompatibility),
+			uniqueItems: true,
+		},
+		{ links: [{ suffix: "[]" }] }
 	);
 	addField(
 		"timeEstimate",

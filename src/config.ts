@@ -18,6 +18,7 @@ export const ALL_FIELD_ROLES: FieldRole[] = [
 	"tags",
 	"contexts",
 	"projects",
+	"attachments",
 	"timeEstimate",
 	"dateCreated",
 	"dateModified",

@@ -1,4 +1,4 @@
-export const TASKNOTES_SPEC_VERSION = "0.3.0-rc.1";
+export const TASKNOTES_SPEC_VERSION = "0.3.0-rc.2";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
@@ -51,6 +51,7 @@ export interface TaskInfo {
 	tags?: string[];
 	contexts?: string[];
 	projects?: string[];
+	attachments?: string[];
 	recurrence?: string;
 	recurrence_anchor?: RecurrenceAnchor;
 	complete_instances?: string[];
@@ -111,6 +112,7 @@ export interface FieldMapping {
 	scheduled: string;
 	contexts: string;
 	projects: string;
+	attachments: string;
 	timeEstimate: string;
 	completedDate: string;
 	dateCreated: string;
@@ -280,6 +282,7 @@ export type FieldRole =
 	| "tags"
 	| "contexts"
 	| "projects"
+	| "attachments"
 	| "timeEstimate"
 	| "dateCreated"
 	| "dateModified"

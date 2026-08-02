@@ -1,4 +1,5 @@
 import { getDatePart, validateDateString } from "./date";
+import { validateAttachmentReferences } from "./attachments";
 import { isCompletedStatus } from "./config";
 import { taskInfoSchema, timeEntrySchema } from "./schema";
 import type {
@@ -71,6 +72,16 @@ export function validateTask(task: Partial<TaskInfo>): TaskValidationResult {
 
 	if (task.timeEntries) {
 		issues.push(...validateTimeEntries(task.timeEntries).issues);
+	}
+
+	for (const issue of validateAttachmentReferences(task.attachments, task.path).issues) {
+		issues.push({
+			code: issue.code,
+			message: issue.message,
+			severity: "error",
+			path: ["attachments", String(issue.index)],
+			field: "attachments",
+		});
 	}
 
 	return {
