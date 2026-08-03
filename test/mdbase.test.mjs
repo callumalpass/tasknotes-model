@@ -100,19 +100,25 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	const pack = await buildTaskNotesMdbaseTypePack(resources);
 
 	assert.deepEqual(pack.provides, [
-		{ id: "tasknotes.task", version: "0.3.0-rc.3" },
+		{
+			id: "tasknotes.task",
+			version: "0.3.0-rc.3",
+			digest: pack.provides[0].digest,
+		},
 	]);
+	assert.match(pack.provides[0].digest, /^sha256:[0-9a-f]{64}$/);
 	assert.equal(pack.manifest.kind, "mdbase.type-pack");
 	assert.equal(pack.manifest.id, "tasknotes.task");
 	assert.equal(pack.manifest.resources.length, 4);
 	assert.deepEqual(
-		pack.manifest.resources.map(({ kind, target }) => [kind, target]),
+		pack.manifest.resources.map(({ kind, mode, target }) => [kind, mode, target]),
 		[
-			["contract", "_contracts/tasknotes.task.md"],
-			["type", "_types/action.md"],
-			["schema", "_schemas/tasknotes/tasknotes-task.schema.json"],
+			["contract", "managed", "_contracts/tasknotes.task.md"],
+			["type", "seed", "_types/action.md"],
+			["schema", "managed", "_schemas/tasknotes/tasknotes-task.schema.json"],
 			[
 				"schema",
+				"managed",
 				"_schemas/tasknotes/tasknotes-task-binding.schema.json",
 			],
 		]

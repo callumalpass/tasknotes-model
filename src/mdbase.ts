@@ -123,14 +123,20 @@ export interface TaskNotesMdbaseTypePack {
 		description: string;
 		resources: Array<{
 			kind: "contract" | "type" | "schema";
+			mode: "managed" | "seed";
 			source: string;
 			target: string;
 			digest: string;
 		}>;
 	};
 	resources: Array<{ source: string; document: string }>;
-	provides: Array<{ id: "tasknotes.task"; version: string }>;
+	provides: Array<{ id: "tasknotes.task"; version: string; digest: string }>;
 }
+
+/** Version of the generated definition bundle, independent of contract version. */
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.9";
+export const TASKNOTES_CONTRACT_DIGEST =
+	"sha256:ef411577c2817b06ab2c8fcfe1241e005b7cd4355723b22ac14346462b5d0049";
 
 export interface TaskNotesMdbaseTypeSettingsPatch {
 	defaultStatus?: string;
@@ -761,17 +767,11 @@ export function buildTaskNotesMdbaseResources(
 		description: `Portable task data and behavior defined by tasknotes-spec ${TASKNOTES_SPEC_VERSION}.`,
 		record_schema: {
 			dialect: "json-schema-2020-12",
-			ref: relativeResourceReference(
-				`${contractsFolder}/tasknotes.task.md`,
-				`${schemasFolder}/tasknotes-task.schema.json`
-			),
+			value: taskSchema,
 		},
 		binding_schema: {
 			dialect: "json-schema-2020-12",
-			ref: relativeResourceReference(
-				`${contractsFolder}/tasknotes.task.md`,
-				`${schemasFolder}/tasknotes-task-binding.schema.json`
-			),
+			value: bindingSchema,
 		},
 	};
 	const taskSchemaDocument = `${JSON.stringify(taskSchema, null, 2)}\n`;
@@ -840,40 +840,58 @@ export async function buildTaskNotesMdbaseTypePack(
 	const definitions = [
 		{
 			kind: "contract" as const,
+			mode: "managed" as const,
 			source: "contracts/tasknotes.task.md",
 			target: resources.paths.contract,
 			document: resources.contractDocument,
 		},
 		{
 			kind: "type" as const,
+			mode: "seed" as const,
 			source: typeSource,
 			target: resources.paths.type,
 			document: resources.typeDocument,
 		},
 		{
 			kind: "schema" as const,
+			mode: "managed" as const,
 			source: "schemas/tasknotes-task.schema.json",
 			target: resources.paths.taskSchema,
 			document: resources.taskSchemaDocument,
 		},
 		{
 			kind: "schema" as const,
+			mode: "managed" as const,
 			source: "schemas/tasknotes-task-binding.schema.json",
 			target: resources.paths.bindingSchema,
 			document: resources.bindingSchemaDocument,
 		},
 	];
+	const contractDigest = await sha256(canonicalJson({
+		kind: "mdbase.contract",
+		contract_type: "record",
+		id: "tasknotes.task",
+		version: TASKNOTES_SPEC_VERSION,
+		record_schema: resources.taskSchema,
+		binding_schema: resources.bindingSchema,
+	}));
+	if (contractDigest !== TASKNOTES_CONTRACT_DIGEST) {
+		throw new Error(
+			"The TaskNotes contract changed without updating TASKNOTES_CONTRACT_DIGEST."
+		);
+	}
 	return {
 		manifest: {
 			kind: "mdbase.type-pack",
 			id: "tasknotes.task",
-			version: TASKNOTES_SPEC_VERSION,
+			version: TASKNOTES_MDBASE_PACK_VERSION,
 			name: "TaskNotes task",
 			description:
 				"TaskNotes task contract, implementation, and referenced JSON Schemas.",
 			resources: await Promise.all(
-				definitions.map(async ({ kind, source, target, document }) => ({
+				definitions.map(async ({ kind, mode, source, target, document }) => ({
 					kind,
+					mode,
 					source,
 					target,
 					digest: await sha256(document),
@@ -884,7 +902,11 @@ export async function buildTaskNotesMdbaseTypePack(
 			source,
 			document,
 		})),
-		provides: [{ id: "tasknotes.task", version: TASKNOTES_SPEC_VERSION }],
+		provides: [{
+			id: "tasknotes.task",
+			version: TASKNOTES_SPEC_VERSION,
+			digest: contractDigest,
+		}],
 	};
 }
 
@@ -1529,27 +1551,6 @@ function taskNotesImplementation(
 	);
 }
 
-function relativeResourceReference(
-	sourcePath: string,
-	targetPath: string
-): string {
-	const sourceDirectory = sourcePath.split("/").slice(0, -1);
-	const target = targetPath.split("/");
-	let common = 0;
-	while (
-		common < sourceDirectory.length &&
-		common < target.length &&
-		sourceDirectory[common] === target[common]
-	) {
-		common += 1;
-	}
-	const segments = [
-		...sourceDirectory.slice(common).map(() => ".."),
-		...target.slice(common),
-	];
-	return segments.join("/");
-}
-
 function requiredConfiguredValue(
 	value: string,
 	allowed: readonly string[],
@@ -1650,6 +1651,24 @@ async function sha256(value: string): Promise<string> {
 	return `sha256:${Array.from(new Uint8Array(digest), (byte) =>
 		byte.toString(16).padStart(2, "0")
 	).join("")}`;
+}
+
+function canonicalJson(value: unknown): string {
+	if (value === null || typeof value === "boolean" || typeof value === "string") {
+		return JSON.stringify(value);
+	}
+	if (typeof value === "number") {
+		if (!Number.isFinite(value)) throw new Error("Contract identity contains a non-finite number.");
+		return JSON.stringify(value);
+	}
+	if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+	if (isRecord(value)) {
+		return `{${Object.keys(value)
+			.sort()
+			.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+			.join(",")}}`;
+	}
+	throw new Error("Contract identity contains a non-JSON value.");
 }
 
 function isRecord(value: unknown): value is Record<string, any> {
