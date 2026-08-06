@@ -258,10 +258,6 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 		"priority": {
 			"$ref": "#/$defs/priorityPolicy"
 		},
-		"runtime_timezone": {
-			"type": "string",
-			"minLength": 1
-		},
 		"recurrence": {
 			"$ref": "#/$defs/recurrencePolicy"
 		},
