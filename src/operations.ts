@@ -237,8 +237,14 @@ export function buildTaskUpdatePlan({
 		storeTitleInFilename,
 		userFields
 	);
-	const frontmatterPatch = buildSetPatch(mapped);
-	addUnsetMappedFieldDeletes(frontmatterPatch, { ...normalizedUpdates, ...recurrenceUpdates }, fieldMapping);
+	const originalMapped = mapTaskToFrontmatter(
+		fieldMapping,
+		originalTask,
+		taskTag,
+		storeTitleInFilename,
+		userFields
+	);
+	const frontmatterPatch = buildFrontmatterPatch(originalMapped, mapped);
 	return {
 		kind: "task.update",
 		updatedTask,
@@ -357,11 +363,13 @@ export function buildUpdatedTaskFromPlan({
 	if (finalTags) updatedTask.tags = finalTags;
 	if (normalizedDetails !== null) updatedTask.details = normalizedDetails;
 	if (updates.status !== undefined && !originalTask.recurrence) {
-		if (isCompletedStatusFn(updates.status)) {
-			if (!originalTask.completedDate) updatedTask.completedDate = currentDateString;
-		} else {
-			updatedTask.completedDate = undefined;
-		}
+		applyStatusCompletionInvariant(
+			updatedTask,
+			originalTask,
+			updates.status,
+			currentDateString,
+			isCompletedStatusFn
+		);
 	}
 	return updatedTask;
 }
@@ -380,7 +388,13 @@ export function buildTaskPropertyUpdatePlan({
 
 	if (property === "status" && !freshTask.recurrence) {
 		const status = String(normalizedValue ?? "");
-		updatedTask.completedDate = isCompletedStatus(status, statuses) ? currentDateString : undefined;
+		applyStatusCompletionInvariant(
+			updatedTask,
+			freshTask,
+			status,
+			currentDateString,
+			(candidate) => isCompletedStatus(candidate, statuses)
+		);
 	}
 
 	const fieldName = fieldNameForTaskProperty(fieldMapping, property);
@@ -391,8 +405,8 @@ export function buildTaskPropertyUpdatePlan({
 		} else if (property === "status") {
 			const status = String(normalizedValue ?? "");
 			frontmatterPatch.push({ op: "set", field: fieldName, value: coerceStatusFrontmatterValue(status) });
-			if (!freshTask.recurrence && isCompletedStatus(status, statuses)) {
-				frontmatterPatch.push({ op: "set", field: fieldMapping.completedDate, value: currentDateString });
+			if (!freshTask.recurrence && updatedTask.completedDate) {
+				frontmatterPatch.push({ op: "set", field: fieldMapping.completedDate, value: updatedTask.completedDate });
 			} else if (!freshTask.recurrence) {
 				frontmatterPatch.push({ op: "delete", field: fieldMapping.completedDate });
 			}
@@ -1204,6 +1218,31 @@ function buildSetPatch(frontmatter: Record<string, unknown>): TaskPatchOperation
 		.map(([field, value]) => ({ op: "set", field, value }) satisfies TaskPatchOperation);
 }
 
+function buildFrontmatterPatch(
+	original: Record<string, unknown>,
+	updated: Record<string, unknown>
+): TaskPatchOperation[] {
+	const patch = buildSetPatch(updated);
+	for (const field of Object.keys(original)) {
+		if (!Object.prototype.hasOwnProperty.call(updated, field) || updated[field] === undefined) {
+			patch.push({ op: "delete", field });
+		}
+	}
+	return patch;
+}
+
+function applyStatusCompletionInvariant(
+	updatedTask: TaskInfo,
+	originalTask: TaskInfo,
+	status: string,
+	currentDateString: string,
+	isCompleted: (status: string) => boolean
+): void {
+	updatedTask.completedDate = isCompleted(status)
+		? originalTask.completedDate ?? currentDateString
+		: undefined;
+}
+
 function applySpecFieldsToTaskInfo(task: TaskInfo, fields: Record<string, unknown>): TaskInfo {
 	const updatedTask = { ...task };
 	if (Object.prototype.hasOwnProperty.call(fields, "title")) updatedTask.title = readString(fields.title) || updatedTask.title;
@@ -1252,52 +1291,6 @@ function applySpecFieldsToTaskInfo(task: TaskInfo, fields: Record<string, unknow
 		updatedTask.attachments = getStringArray(fields.attachments);
 	}
 	return updatedTask;
-}
-
-function addUnsetMappedFieldDeletes(
-	patch: TaskPatchOperation[],
-	updates: TaskUpdateInput,
-	fieldMapping: FieldMapping
-): void {
-	const deletable: Array<[keyof TaskUpdateInput, FieldMappingKey]> = [
-		["due", "due"],
-		["scheduled", "scheduled"],
-		["contexts", "contexts"],
-		["timeEstimate", "timeEstimate"],
-		["completedDate", "completedDate"],
-		["recurrence", "recurrence"],
-		["recurrence_parent", "recurrenceParent"],
-		["occurrence_date", "occurrenceDate"],
-		["occurrence_materialization", "occurrenceMaterialization"],
-		["occurrence_next_trigger", "occurrenceNextTrigger"],
-		["occurrence_template", "occurrenceTemplate"],
-		["occurrence_past_horizon", "occurrencePastHorizon"],
-		["occurrence_future_horizon", "occurrenceFutureHorizon"],
-		["blockedBy", "blockedBy"],
-		["googleCalendarExceptionOriginalScheduled", "googleCalendarExceptionOriginalScheduled"],
-	];
-	for (const [updateKey, mappingKey] of deletable) {
-		if (Object.prototype.hasOwnProperty.call(updates, updateKey) && updates[updateKey] === undefined) {
-			patch.push({ op: "delete", field: fieldMapping[mappingKey] });
-		}
-	}
-	if (Object.prototype.hasOwnProperty.call(updates, "projects")) {
-		if (!Array.isArray(updates.projects) || updates.projects.length === 0) {
-			patch.push({ op: "delete", field: fieldMapping.projects });
-		}
-	}
-	if (Object.prototype.hasOwnProperty.call(updates, "attachments")) {
-		if (!Array.isArray(updates.attachments) || updates.attachments.length === 0) {
-			patch.push({ op: "delete", field: fieldMapping.attachments });
-		}
-	}
-	if (
-		Object.prototype.hasOwnProperty.call(updates, "googleCalendarMovedOriginalDates") &&
-		(!Array.isArray(updates.googleCalendarMovedOriginalDates) ||
-			updates.googleCalendarMovedOriginalDates.length === 0)
-	) {
-		patch.push({ op: "delete", field: fieldMapping.googleCalendarMovedOriginalDates });
-	}
 }
 
 function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof TaskInfo): string | undefined {
