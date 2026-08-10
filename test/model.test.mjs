@@ -163,6 +163,43 @@ test("keeps modification timestamps valid when a device clock moves backwards", 
 	assert.equal(plan.dateModified, "2026-07-28T10:00:00.001Z");
 });
 
+test("status transitions delete the mapped completion date when a task is reopened", () => {
+	const fieldMapping = {
+		...DEFAULT_FIELD_MAPPING,
+		status: "state",
+		completedDate: "finished_on",
+	};
+	const completed = buildTaskUpdatePlan({
+		originalTask: {
+			title: "Transition task",
+			status: "open",
+			priority: "normal",
+			path: "Tasks/transition.md",
+			archived: false,
+		},
+		updates: { status: "done" },
+		fieldMapping,
+		statuses: [{ label: "Done", value: "done", isCompleted: true }],
+		now: "2026-08-10T01:00:00.000Z",
+		currentDateString: "2026-08-10",
+	});
+	const reopened = buildTaskUpdatePlan({
+		originalTask: completed.updatedTask,
+		updates: { status: "open" },
+		fieldMapping,
+		statuses: [{ label: "Done", value: "done", isCompleted: true }],
+		now: "2026-08-10T01:01:00.000Z",
+		currentDateString: "2026-08-10",
+	});
+
+	assert.equal(completed.updatedTask.completedDate, "2026-08-10");
+	assert.equal(reopened.updatedTask.completedDate, undefined);
+	assert.deepEqual(
+		reopened.frontmatterPatch.find((operation) => operation.field === "finished_on"),
+		{ op: "delete", field: "finished_on" }
+	);
+});
+
 test("recalculates recurring schedules with DTSTART", () => {
 	const result = recalculateRecurringSchedule({
 		recurrence: "FREQ=DAILY;COUNT=3",
