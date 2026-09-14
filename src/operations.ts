@@ -972,6 +972,7 @@ export function specFrontmatterToTaskInfo(
 		contexts: getStringArray(frontmatter.contexts),
 		projects: getStringArray(frontmatter.projects),
 		attachments: getStringArray(frontmatter.attachments),
+		assignees: getStringArray(frontmatter.assignees),
 		timeEstimate:
 			typeof frontmatter.timeEstimate === "number" ? frontmatter.timeEstimate : undefined,
 		blockedBy: normalizeBlockedByValue(frontmatter.blockedBy),
@@ -1007,6 +1008,7 @@ export function taskInfoToSpecFields(task: Partial<TaskInfo>): Record<string, un
 	writeIfDefined(fields, "contexts", task.contexts);
 	writeIfDefined(fields, "projects", task.projects);
 	writeIfDefined(fields, "attachments", task.attachments);
+	writeIfDefined(fields, "assignees", task.assignees);
 	writeIfDefined(fields, "timeEstimate", task.timeEstimate);
 	writeIfDefined(fields, "blockedBy", task.blockedBy);
 	writeIfDefined(fields, "reminders", task.reminders);
@@ -1287,6 +1289,9 @@ function applySpecFieldsToTaskInfo(task: TaskInfo, fields: Record<string, unknow
 	if (Object.prototype.hasOwnProperty.call(fields, "timeEntries")) {
 		updatedTask.timeEntries = sanitizeTimeEntries(fields.timeEntries as TimeEntry[] | undefined);
 	}
+	if (Object.prototype.hasOwnProperty.call(fields, "assignees")) {
+		updatedTask.assignees = getStringArray(fields.assignees);
+	}
 	if (Object.prototype.hasOwnProperty.call(fields, "attachments")) {
 		updatedTask.attachments = getStringArray(fields.attachments);
 	}
@@ -1303,6 +1308,7 @@ function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof Ta
 		contexts: "contexts",
 		projects: "projects",
 		attachments: "attachments",
+		assignees: "assignees",
 		timeEstimate: "timeEstimate",
 		completedDate: "completedDate",
 		dateCreated: "dateCreated",
@@ -1376,6 +1382,7 @@ function buildInheritedOccurrenceTask(parentTask: TaskInfo, targetDate: string):
 		contexts: cloneArray(parentTask.contexts),
 		projects: cloneArray(parentTask.projects),
 		attachments: cloneArray(parentTask.attachments),
+		assignees: cloneArray(parentTask.assignees),
 		tags: cloneArray(parentTask.tags),
 		timeEstimate: parentTask.timeEstimate,
 		reminders: cloneObjectArray(parentTask.reminders),

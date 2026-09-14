@@ -1,4 +1,4 @@
-export const TASKNOTES_SPEC_VERSION = "0.3.0-rc.3";
+export const TASKNOTES_SPEC_VERSION = "0.3.0-rc.4";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
@@ -52,6 +52,8 @@ export interface TaskInfo {
 	contexts?: string[];
 	projects?: string[];
 	attachments?: string[];
+	/** Stable mdbase.person IDs, not account subjects or file links. */
+	assignees?: string[];
 	recurrence?: string;
 	recurrence_anchor?: RecurrenceAnchor;
 	complete_instances?: string[];
@@ -113,6 +115,7 @@ export interface FieldMapping {
 	contexts: string;
 	projects: string;
 	attachments: string;
+	assignees: string;
 	timeEstimate: string;
 	completedDate: string;
 	dateCreated: string;
@@ -283,6 +286,7 @@ export type FieldRole =
 	| "contexts"
 	| "projects"
 	| "attachments"
+	| "assignees"
 	| "timeEstimate"
 	| "dateCreated"
 	| "dateModified"

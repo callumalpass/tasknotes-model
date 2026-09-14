@@ -125,6 +125,11 @@ export function mapTaskFromFrontmatter(
 	if (frontmatter[mapping.projects] !== undefined) {
 		mapped.projects = normalizeStringArrayValue(frontmatter[mapping.projects]);
 	}
+	if (frontmatter[mapping.assignees] !== undefined) {
+		mapped.assignees = Array.isArray(frontmatter[mapping.assignees])
+			? (frontmatter[mapping.assignees] as unknown[]).filter((value): value is string => typeof value === "string")
+			: [];
+	}
 	if (frontmatter[mapping.attachments] !== undefined) {
 		mapped.attachments = normalizeAttachmentList(frontmatter[mapping.attachments]);
 	}
@@ -268,6 +273,7 @@ export function mapTaskToFrontmatter(
 	if (taskData.projects !== undefined && (!Array.isArray(taskData.projects) || taskData.projects.length > 0)) {
 		frontmatter[mapping.projects] = taskData.projects;
 	}
+	if (taskData.assignees !== undefined) frontmatter[mapping.assignees] = [...taskData.assignees];
 	if (taskData.attachments !== undefined && taskData.attachments.length > 0) {
 		frontmatter[mapping.attachments] = taskData.attachments;
 	}
