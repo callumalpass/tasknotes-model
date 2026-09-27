@@ -20,6 +20,7 @@ import {
 	mapTaskToFrontmatter,
 	normalizeDependencyEntry,
 	parseLinkToPath,
+	readAssigneeIds,
 	serializeDependencies,
 } from "./mapping";
 import type {
@@ -972,7 +973,7 @@ export function specFrontmatterToTaskInfo(
 		contexts: getStringArray(frontmatter.contexts),
 		projects: getStringArray(frontmatter.projects),
 		attachments: getStringArray(frontmatter.attachments),
-		assignees: getStringArray(frontmatter.assignees),
+		assignees: readAssigneeIds(frontmatter.assignees),
 		timeEstimate:
 			typeof frontmatter.timeEstimate === "number" ? frontmatter.timeEstimate : undefined,
 		blockedBy: normalizeBlockedByValue(frontmatter.blockedBy),

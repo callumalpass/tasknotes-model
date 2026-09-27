@@ -25,3 +25,13 @@ test("the new task contract declares assignments without pretending they are fil
   assert.equal(resources.type.implements[0].fields.assignees, "assignees");
   assert.equal(resources.type.collection.links["assignees[]"], undefined);
 });
+
+test("hand-edited assignee values are read as IDs or left exactly as written", () => {
+  const scalar = mapTaskFromFrontmatter(mapping, { title: "One", owners: "alex" }, "tasks/one.md");
+  assert.deepEqual(scalar.assignees, ["alex"]);
+  for (const owners of [["alex", 5], { id: "alex" }, 7]) {
+    const task = mapTaskFromFrontmatter(mapping, { title: "Odd", owners }, "tasks/odd.md");
+    assert.equal(task.assignees, undefined);
+    assert.equal(Object.hasOwn(mapTaskToFrontmatter(mapping, task), "owners"), false);
+  }
+});
