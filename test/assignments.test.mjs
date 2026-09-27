@@ -4,7 +4,7 @@ import { DEFAULT_FIELD_MAPPING, mapTaskFromFrontmatter, mapTaskToFrontmatter, bu
 
 const mapping = { ...DEFAULT_FIELD_MAPPING, assignees: "owners" };
 test("portable assignments preserve exact IDs through custom field mappings", () => {
-  const ids = ["Person_A", "person_missing"];
+  const ids = ["[[People/Alex Rivera]]", "[[Former teammate]]"];
   const task = mapTaskFromFrontmatter(mapping, { title: "Assigned", owners: ids }, "tasks/assigned.md");
   assert.deepEqual(task.assignees, ids);
   assert.deepEqual(mapTaskToFrontmatter(mapping, task).owners, ids);
@@ -18,12 +18,16 @@ test("ordinary task updates retain unresolved assignments and explicitly clear t
   assert.deepEqual(buildTaskUpdatePlan({ ...options, updates: { assignees: [] } }).updatedTask.assignees, []);
 });
 
-test("the new task contract declares assignments without pretending they are file links", () => {
+test("the task contract declares assignments as links resolved by the collection", () => {
   const resources = buildTaskNotesMdbaseResources();
-  assert.equal(resources.contract.version, "0.3.0-rc.4");
+  assert.equal(resources.contract.version, "0.3.0-rc.5");
+  assert.equal(resources.type.version, 3);
   assert.equal(resources.taskSchema.properties.assignees.uniqueItems, true);
   assert.equal(resources.type.implements[0].fields.assignees, "assignees");
-  assert.equal(resources.type.collection.links["assignees[]"], undefined);
+  // No target_type: several local types may implement mdbase.person.
+  assert.deepEqual(resources.type.collection.links["assignees[]"], { validate_exists: false });
+  const custom = buildTaskNotesMdbaseResources({ modelConfig: { fieldMapping: { ...DEFAULT_FIELD_MAPPING, assignees: "owners" } } });
+  assert.deepEqual(custom.type.collection.links["owners[]"], { validate_exists: false });
 });
 
 test("hand-edited assignee values are read as IDs or left exactly as written", () => {

@@ -1,4 +1,4 @@
-export const TASKNOTES_SPEC_VERSION = "0.3.0-rc.4";
+export const TASKNOTES_SPEC_VERSION = "0.3.0-rc.5";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];

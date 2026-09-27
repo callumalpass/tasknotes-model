@@ -134,9 +134,9 @@ export interface TaskNotesMdbaseTypePack {
 }
 
 /** Version of the generated definition bundle, independent of contract version. */
-export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.13";
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.15";
 export const TASKNOTES_CONTRACT_DIGEST =
-	"sha256:6948f659df6af05ef95aa893f1d57849032546e8c6cfee8afd5afe566e4ceeb0";
+	"sha256:dde71d0d776aa0069ee627fe3c10b1a20f87ba36929a16790598ebfb4e8ebf04";
 
 export interface TaskNotesMdbaseTypeSettingsPatch {
 	defaultStatus?: string;
@@ -477,9 +477,13 @@ export function buildTaskNotesMdbaseResources(
 		arraySchema(stringSchema({}, legacyCompatibility), legacyCompatibility),
 		{ links: [{ suffix: "[]", targetType: "any" }] }
 	);
-	addField("assignees", mapping.assignees, {
-		type: "array", items: { type: "string", minLength: 1, pattern: "\\S" }, uniqueItems: true,
-	});
+	// Links to mdbase.person records, resolved by the collection's own link rules.
+	addField(
+		"assignees",
+		mapping.assignees,
+		{ type: "array", items: { type: "string", minLength: 1, pattern: "\\S" }, uniqueItems: true },
+		{ links: [{ suffix: "[]" }] }
+	);
 	addField(
 		"attachments",
 		mapping.attachments,
@@ -735,7 +739,7 @@ export function buildTaskNotesMdbaseResources(
 	const type: Record<string, unknown> = {
 		kind: "mdbase.type",
 		name: typeName,
-		version: 2,
+		version: 3,
 		description: "A task managed by TaskNotes.",
 		match: buildMatch(modelConfig),
 		schema: {
