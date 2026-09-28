@@ -66,6 +66,7 @@ export const taskInfoSchema = z.object({
 	contexts: z.array(z.string()).optional(),
 	projects: z.array(z.string()).optional(),
 	attachments: z.array(z.string().min(1)).optional(),
+	assignees: z.array(z.string().regex(/\S/)).optional(),
 	recurrence: z.string().optional(),
 	recurrence_anchor: z.enum(["scheduled", "completion"]).optional(),
 	complete_instances: z.array(z.string()).optional(),

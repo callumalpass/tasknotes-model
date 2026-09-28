@@ -11,6 +11,8 @@ It intentionally contains no Obsidian API usage, no vault IO, no process exits, 
 - TaskNotes task, config, field mapping, status, priority, recurrence, and time-entry types
 - default model configuration
 - TaskNotes frontmatter mapping and normalization
+- portable person-ID assignments, including custom field mappings, explicit
+  clearing, unresolved-reference preservation, and occurrence inheritance
 - attachment-list normalization, safe collection-path resolution, canonical
   references, and validation
 - date parsing, date comparison, and storage-date semantics

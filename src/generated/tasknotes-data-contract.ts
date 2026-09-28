@@ -5,7 +5,7 @@ export const TASKNOTES_TASK_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task.schema.json",
 	"title": "TaskNotes portable task view",
-	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.3 record contract.",
+	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.5 record contract.",
 	"type": "object",
 	"required": [
 		"status",
@@ -64,6 +64,16 @@ export const TASKNOTES_TASK_SCHEMA = {
 			"items": {
 				"type": "string"
 			}
+		},
+		"assignees": {
+			"type": "array",
+			"uniqueItems": true,
+			"items": {
+				"type": "string",
+				"minLength": 1,
+				"pattern": "\\S"
+			},
+			"description": "Links to records implementing mdbase.person, such as [[Alex Rivera]]. Implementing types declare this field in collection.links. These references never grant collection access."
 		},
 		"attachments": {
 			"type": "array",

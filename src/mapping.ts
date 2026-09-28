@@ -125,6 +125,8 @@ export function mapTaskFromFrontmatter(
 	if (frontmatter[mapping.projects] !== undefined) {
 		mapped.projects = normalizeStringArrayValue(frontmatter[mapping.projects]);
 	}
+	const assignees = readAssigneeIds(frontmatter[mapping.assignees]);
+	if (assignees) mapped.assignees = assignees;
 	if (frontmatter[mapping.attachments] !== undefined) {
 		mapped.attachments = normalizeAttachmentList(frontmatter[mapping.attachments]);
 	}
@@ -268,6 +270,7 @@ export function mapTaskToFrontmatter(
 	if (taskData.projects !== undefined && (!Array.isArray(taskData.projects) || taskData.projects.length > 0)) {
 		frontmatter[mapping.projects] = taskData.projects;
 	}
+	if (taskData.assignees !== undefined) frontmatter[mapping.assignees] = [...taskData.assignees];
 	if (taskData.attachments !== undefined && taskData.attachments.length > 0) {
 		frontmatter[mapping.attachments] = taskData.attachments;
 	}
@@ -501,6 +504,16 @@ function normalizeStringValue(value: unknown): string | undefined {
 	if (typeof value === "string") return isBlankString(value) ? undefined : value;
 	if (typeof value === "number" || typeof value === "boolean") return String(value);
 	if (Array.isArray(value)) return value.length === 1 ? normalizeStringValue(value[0]) : undefined;
+	return undefined;
+}
+
+/**
+ * Person IDs from hand-edited frontmatter. A single ID is accepted as a list.
+ * Any other shape is left unread, so saving an unrelated edit never rewrites it.
+ */
+export function readAssigneeIds(value: unknown): string[] | undefined {
+	if (typeof value === "string") return [value];
+	if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) return [...value];
 	return undefined;
 }
 

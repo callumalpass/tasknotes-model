@@ -14,6 +14,7 @@ export const DEFAULT_FIELD_MAPPING: FieldMapping = {
 	contexts: "contexts",
 	projects: "projects",
 	attachments: "attachments",
+	assignees: "assignees",
 	timeEstimate: "timeEstimate",
 	completedDate: "completedDate",
 	dateCreated: "dateCreated",
