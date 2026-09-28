@@ -133,8 +133,15 @@ export interface TaskNotesMdbaseTypePack {
 	provides: Array<{ id: "tasknotes.task"; version: string; digest: string }>;
 }
 
+/**
+ * Version of the generated implementing type. It equals the published starter
+ * type's version, so types written by TaskNotes and by the tasknotes.task pack
+ * agree and pack upgrades do not see a conflicting version change.
+ */
+export const TASKNOTES_MDBASE_TYPE_VERSION = 4;
+
 /** Version of the generated definition bundle, independent of contract version. */
-export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.16";
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.17";
 export const TASKNOTES_CONTRACT_DIGEST =
 	"sha256:dde71d0d776aa0069ee627fe3c10b1a20f87ba36929a16790598ebfb4e8ebf04";
 
@@ -482,7 +489,8 @@ export function buildTaskNotesMdbaseResources(
 		"assignees",
 		mapping.assignees,
 		{ type: "array", items: { type: "string", minLength: 1, pattern: "\\S" }, uniqueItems: true },
-		{ links: [{ suffix: "[]" }] }
+		// Not a v0.2 field, so no legacy nulls to accept; matches the published starter.
+		{ links: [{ suffix: "[]" }], legacyNullable: false }
 	);
 	addField(
 		"attachments",
@@ -739,7 +747,7 @@ export function buildTaskNotesMdbaseResources(
 	const type: Record<string, unknown> = {
 		kind: "mdbase.type",
 		name: typeName,
-		version: 3,
+		version: TASKNOTES_MDBASE_TYPE_VERSION,
 		description: "A task managed by TaskNotes.",
 		match: buildMatch(modelConfig),
 		schema: {

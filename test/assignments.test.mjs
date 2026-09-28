@@ -21,7 +21,7 @@ test("ordinary task updates retain unresolved assignments and explicitly clear t
 test("the task contract declares assignments as links resolved by the collection", () => {
   const resources = buildTaskNotesMdbaseResources();
   assert.equal(resources.contract.version, "0.3.0-rc.5");
-  assert.equal(resources.type.version, 3);
+  assert.equal(resources.type.version, 4);
   assert.equal(resources.taskSchema.properties.assignees.uniqueItems, true);
   assert.equal(resources.type.implements[0].fields.assignees, "assignees");
   // No target_type: several local types may implement mdbase.person.

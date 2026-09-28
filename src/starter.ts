@@ -2,6 +2,7 @@ import { cloneDefaultModelConfig } from "./defaults";
 import { serializeMarkdownDocument } from "./frontmatter";
 import {
 	buildTaskNotesMdbaseResources,
+	TASKNOTES_MDBASE_TYPE_VERSION,
 	type TaskNotesMdbaseOptions,
 	type TaskNotesMdbaseResources,
 } from "./mdbase";
@@ -19,7 +20,57 @@ import { TASKNOTES_SPEC_VERSION, type TaskNotesModelConfig } from "./types";
  * here is a new starter version and must be deliberate. The test suite checks
  * this output against the published type.
  */
-export const TASKNOTES_STARTER_TYPE_VERSION = 4;
+export const TASKNOTES_STARTER_TYPE_VERSION = TASKNOTES_MDBASE_TYPE_VERSION;
+
+/**
+ * Revision of the published starter document (mdbase-contracts
+ * `types/tasknotes-task/<revision>.md`). A revision that does not change the
+ * type's data keeps TASKNOTES_STARTER_TYPE_VERSION, so collections that already
+ * have that version do not see a conflicting version change on upgrade.
+ */
+export const TASKNOTES_STARTER_REVISION = 5;
+
+/**
+ * The generator bookkeeping published in the first starter. Collections keep
+ * their own list (it follows their field mapping), so pack upgrades must not
+ * change it: the starter always publishes this list.
+ */
+export const TASKNOTES_STARTER_MANAGED_FIELDS: readonly string[] = [
+	"attachments",
+	"blockedBy",
+	"complete_instances",
+	"completedDate",
+	"contexts",
+	"dateCreated",
+	"dateModified",
+	"due",
+	"googleCalendarEventId",
+	"googleCalendarExceptionEventId",
+	"googleCalendarExceptionOriginalScheduled",
+	"googleCalendarMovedOriginalDates",
+	"icsEventId",
+	"id",
+	"occurrence_date",
+	"occurrence_future_horizon",
+	"occurrence_materialization",
+	"occurrence_next_trigger",
+	"occurrence_past_horizon",
+	"occurrence_template",
+	"priority",
+	"projects",
+	"recurrence",
+	"recurrence_anchor",
+	"recurrence_parent",
+	"reminders",
+	"scheduled",
+	"skipped_instances",
+	"status",
+	"tags",
+	"tasknotes_manual_order",
+	"timeEntries",
+	"timeEstimate",
+	"title",
+];
 
 export const TASKNOTES_STARTER_PROFILES = [
 	"core-lite",
@@ -87,6 +138,10 @@ export function buildTaskNotesStarterResources(
 		throw new Error(`The generated type does not implement tasknotes.task ${TASKNOTES_SPEC_VERSION}.`);
 	}
 	type.version = TASKNOTES_STARTER_TYPE_VERSION;
+	type["x-tasknotes-generator"] = {
+		...type["x-tasknotes-generator"],
+		managed_fields: [...TASKNOTES_STARTER_MANAGED_FIELDS],
+	};
 	// One shared date schema, so due and scheduled cannot drift apart.
 	const taskDateSchema = {
 		anyOf: [
