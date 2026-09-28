@@ -1,6 +1,6 @@
 {
 	"name": "@tasknotes/model",
-	"version": "0.3.0-rc.13",
+	"version": "0.3.0-rc.14",
 	"description": "TaskNotes model, mapping, validation, recurrence, and operation-planning reference implementation.",
 	"license": "MIT",
 	"type": "module",
@@ -95,6 +95,11 @@
 			"types": "./dist/types/mdbase.d.ts",
 			"import": "./dist/esm/mdbase.js",
 			"require": "./dist/cjs/mdbase.cjs"
+		},
+		"./starter": {
+			"types": "./dist/types/starter.d.ts",
+			"import": "./dist/esm/starter.js",
+			"require": "./dist/cjs/starter.cjs"
 		},
 		"./conformance": {
 			"types": "./dist/types/conformance.d.ts",

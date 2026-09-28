@@ -54,6 +54,7 @@ The package exports both the root module and focused subpath modules:
 | `@tasknotes/model/operations` | Host-independent task mutation planning, including materialized occurrence plans |
 | `@tasknotes/model/frontmatter` | Markdown task document parse/serialize helpers |
 | `@tasknotes/model/mdbase` | Canonical mdbase v0.3 config, contract, schema, and implementing-type generation |
+| `@tasknotes/model/starter` | The published TaskNotes starter type (`tasknotes.task` pack seed), pinned to mdbase-contracts by the test suite. Use it, not the plugin defaults in `defaults`, to build starter types |
 | `@tasknotes/model/conformance` | tasknotes-spec conformance operation dispatcher |
 
 ## Examples

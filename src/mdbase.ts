@@ -134,7 +134,7 @@ export interface TaskNotesMdbaseTypePack {
 }
 
 /** Version of the generated definition bundle, independent of contract version. */
-export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.15";
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.16";
 export const TASKNOTES_CONTRACT_DIGEST =
 	"sha256:dde71d0d776aa0069ee627fe3c10b1a20f87ba36929a16790598ebfb4e8ebf04";
 

@@ -11,4 +11,5 @@ export * from "./validation";
 export * from "./operations";
 export * from "./frontmatter";
 export * from "./mdbase";
+export * from "./starter";
 export * from "./conformance";
