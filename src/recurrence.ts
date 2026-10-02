@@ -17,7 +17,18 @@ const rruleDefault = Reflect.get(rrulePackage, "default") as
 	| undefined;
 const RRule = ((rrulePackage as typeof import("rrule")).RRule ??
 	rruleDefault?.RRule) as typeof import("rrule").RRule;
+const rrulestr = ((rrulePackage as typeof import("rrule")).rrulestr ??
+	rruleDefault?.rrulestr) as typeof import("rrule").rrulestr;
 const MAX_FINITE_INSTANCE_COUNT = 10000;
+
+// DTSTART's value ends at a semicolon or line break, never in the RRULE.
+const DTSTART_PATTERN = /DTSTART(?:;[^:\r\n]+)?:([^;\r\n]+)/;
+
+function recurrenceRuleText(recurrence: string): string {
+	const withoutStart = recurrence.replace(DTSTART_PATTERN, "").replace(/^;/, "").trim();
+	const ruleLine = withoutStart.split(/\r?\n/).find((line) => line.startsWith("RRULE:"));
+	return ruleLine ? ruleLine.slice("RRULE:".length) : withoutStart;
+}
 
 type RRuleInstance = {
 	between(start: Date, end: Date, inclusive?: boolean): Date[];
@@ -266,7 +277,7 @@ export function getRecurrenceDisplayText(recurrence: string): string {
 		if (!recurrence.includes("FREQ=")) {
 			return "rrule";
 		}
-		const rruleString = recurrence.replace(/DTSTART:[^;]+;?/, "");
+		const rruleString = recurrenceRuleText(recurrence);
 		return RRule.fromString(rruleString).toText();
 	} catch {
 		return "rrule";
@@ -277,7 +288,7 @@ export function addDTSTARTToRecurrenceRule(
 	task: Pick<RecurringTaskLike, "recurrence" | "scheduled" | "dateCreated">
 ): string | null {
 	if (!task.recurrence || typeof task.recurrence !== "string") return null;
-	if (task.recurrence.includes("DTSTART:")) return task.recurrence;
+	if (DTSTART_PATTERN.test(task.recurrence)) return task.recurrence;
 	const sourceDateString = task.scheduled || task.dateCreated;
 	if (!sourceDateString) return null;
 	return `DTSTART:${formatDtstartValue(sourceDateString)};${task.recurrence}`;
@@ -286,8 +297,13 @@ export function addDTSTARTToRecurrenceRule(
 export function updateDTSTARTInRecurrenceRule(recurrence: string, dateStr: string): string | null {
 	if (!recurrence || typeof recurrence !== "string") return null;
 	const dtstartValue = formatDtstartValue(dateStr);
-	if (recurrence.includes("DTSTART:")) {
-		return recurrence.replace(/DTSTART:[^;]+;?/, `DTSTART:${dtstartValue};`);
+	if (DTSTART_PATTERN.test(recurrence)) {
+		return recurrence.replace(DTSTART_PATTERN, (property, previousValue: string) => {
+			// Completion supplies a date, not a new clock. Retain the original
+			// floating/UTC time and property parameters (TZID or VALUE=DATE).
+			const clock = !hasTimeComponent(dateStr) ? previousValue.match(/T\d{6}Z?$/)?.[0] ?? "" : "";
+			return property.slice(0, property.length - previousValue.length) + dtstartValue + clock;
+		});
 	}
 	return `DTSTART:${dtstartValue};${recurrence}`;
 }
@@ -298,7 +314,7 @@ export function addDTSTARTToRecurrenceRuleWithDraggedTime(
 	allDay: boolean
 ): string | null {
 	if (!task.recurrence || typeof task.recurrence !== "string") return null;
-	if (task.recurrence.includes("DTSTART:")) return task.recurrence;
+	if (DTSTART_PATTERN.test(task.recurrence)) return task.recurrence;
 	const sourceDateString = task.scheduled || task.dateCreated;
 	if (!sourceDateString) return null;
 
@@ -370,7 +386,13 @@ function createRRule(
 	if (!task.recurrence || typeof task.recurrence !== "string") return null;
 	const dtstart = getRRuleDtstart(task);
 	if (!dtstart) return null;
-	const rruleString = task.recurrence.replace(/DTSTART:[^;]+;?/, "").replace(/^;/, "").trim();
+	if (/\r?\n/.test(task.recurrence)) {
+		// rrulestr does not recognize VALUE=DATE on DTSTART; normalize only
+		// its parser input, leaving the stored RFC property unchanged.
+		const parserInput = task.recurrence.replace(/DTSTART;VALUE=DATE:/, "DTSTART:");
+		return rrulestr(parserInput, { dtstart });
+	}
+	const rruleString = recurrenceRuleText(task.recurrence);
 	const rruleOptions = RRule.parseString(rruleString);
 	rruleOptions.dtstart = dtstart;
 	return new RRule(rruleOptions);
@@ -388,7 +410,7 @@ function getRRuleDtstart(
 }
 
 function parseDtstartFromRecurrence(recurrence: string): Date | null {
-	const match = recurrence.match(/DTSTART:(\d{8}(?:T\d{6}Z?)?)/);
+	const match = recurrence.match(/DTSTART(?:;[^:\r\n]+)?:(\d{8}(?:T\d{6}Z?)?)/);
 	if (!match) return null;
 	return parseRRuleDateValue(match[1], false);
 }
@@ -574,12 +596,8 @@ function getNextOccurrenceDate(
 
 function buildRRuleFromRecurrence(recurrence: string, sourceDate: string): RRuleInstance | null {
 	try {
-		const rruleString = recurrence.replace(/DTSTART:[^;]+;?/, "").replace(/^;/, "").trim();
-		if (!rruleString.includes("FREQ=")) return null;
-		const options = RRule.parseString(rruleString);
-		const dtstart = parseDtstartFromRecurrence(recurrence) || parseDateString(sourceDate);
-		if (dtstart) options.dtstart = dtstart;
-		return new RRule(options);
+		if (!recurrence.includes("FREQ=")) return null;
+		return createRRule({ recurrence, scheduled: sourceDate });
 	} catch {
 		return null;
 	}
