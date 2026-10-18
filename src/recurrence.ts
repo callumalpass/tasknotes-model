@@ -9,6 +9,7 @@ import {
 	hasTimeComponent,
 	parseDateToLocal,
 	parseDateToUTC,
+	resolveDateTimeRangeBound,
 } from "./date";
 import type { RecurrenceAnchor, TaskInfo } from "./types";
 
@@ -452,7 +453,8 @@ function getLookAheadDays(recurrence: string): number {
 
 function formatDtstartValue(dateStr: string): string {
 	if (hasTimeComponent(dateStr)) {
-		const dateTime = parseDateToLocal(dateStr);
+		// Task dates are often minute precision ("2026-06-04T10:30"), which the strict parser rejects.
+		const dateTime = resolveDateTimeRangeBound(dateStr, "from");
 		const year = dateTime.getFullYear();
 		const month = String(dateTime.getMonth() + 1).padStart(2, "0");
 		const day = String(dateTime.getDate()).padStart(2, "0");
