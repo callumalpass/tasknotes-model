@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Calendar index membership/order changes retain explicit host revisions and cached expansions for unchanged task objects.
 - Calendar recurrence day expansion no longer depends on the JavaScript process timezone for RFC TZID rules. Pattern edits preserve multiline RRULE/EXDATE data; duration ends in the second DST overlap clock retain their instant.
 
 ## 0.3.0-rc.16

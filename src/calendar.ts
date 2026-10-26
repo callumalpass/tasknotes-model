@@ -660,20 +660,29 @@ export function createCalendarEntryIndex(
 	let contextKey = cacheContextKey(context);
 	const tasks = new Map<
 		string,
-		{ task: CalendarTask; revision?: string | number; ranges: Map<string, CalendarEntry[]> }
+		{ task: CalendarTask; revision?: string | number; explicitRevision: boolean; ranges: Map<string, CalendarEntry[]> }
 	>();
-	const upsert: CalendarEntryIndex["upsert"] = (id, task, revision = task.dateModified) => {
+	const upsert: CalendarEntryIndex["upsert"] = (id, task, revision) => {
 		if (id !== calendarTaskId(task)) throw new Error("calendar-task-mismatch");
+		const explicitRevision = revision !== undefined;
+		const effectiveRevision = revision ?? task.dateModified;
 		const previous = tasks.get(id);
-		if (previous?.task === task && previous.revision === revision) return;
-		tasks.set(id, { task, revision, ranges: new Map() });
+		if (previous?.task === task && previous.revision === effectiveRevision) {
+			previous.explicitRevision = explicitRevision;
+			return;
+		}
+		tasks.set(id, { task, revision: effectiveRevision, explicitRevision, ranges: new Map() });
 	};
 	return {
 		upsert,
 		setTasks(next) {
 			const ordered = next.map((task) => {
 				const id = calendarTaskId(task);
-				upsert(id, task);
+				const previous = tasks.get(id);
+				// Membership/order updates must not replace a host revision with
+				// dateModified for the very same object. Default revisions still
+				// observe a changed dateModified on mutable task inputs.
+				upsert(id, task, previous?.task === task && previous.explicitRevision ? previous.revision : undefined);
 				return [id, tasks.get(id)!] as const;
 			});
 			tasks.clear();

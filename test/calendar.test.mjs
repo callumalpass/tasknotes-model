@@ -121,6 +121,25 @@ test("unchanged tasks are not re-expanded when another task or an unused clock c
 	index.upsert("a", instrumented, 2);
 	index.entriesInRange(input.range);
 	assert.ok(recurrenceReads > reads);
+	const explicitReads = recurrenceReads;
+	const other = { path: "other", title: "Other", scheduled: "2026-03-09" };
+	index.setTasks([other, instrumented]);
+	index.entriesInRange(input.range);
+	assert.equal(recurrenceReads, explicitReads, "reordering/membership preserves explicit revision caches");
+	index.setTasks([instrumented]);
+	index.entriesInRange(input.range);
+	assert.equal(recurrenceReads, explicitReads);
+	index.upsert("a", instrumented, 3);
+	index.entriesInRange(input.range);
+	assert.ok(recurrenceReads > explicitReads);
+
+	const mutable = { ...original, dateModified: "v1" };
+	index.setTasks([mutable]);
+	const before = index.entriesInRange(input.range);
+	mutable.dateModified = "v2";
+	mutable.title = "Changed title";
+	index.setTasks([mutable]);
+	assert.notDeepEqual(index.entriesInRange(input.range), before, "default revision changes still invalidate");
 });
 
 test("explicit timezone is independent of the runtime timezone for every fixture and edit", () => {
