@@ -88,6 +88,10 @@ export interface BuildMaterializeOccurrencePlanInput {
 	parentLink?: string;
 	defaultStatus?: string;
 	defaultPriority?: string;
+	/** Status for a date the parent records in `complete_instances`. */
+	completedStatus?: string;
+	/** Status for a date the parent records in `skipped_instances`. */
+	skippedStatus?: string;
 	templateTask?: Partial<TaskInfo>;
 	overrides?: Partial<TaskInfo>;
 	allowNonGeneratedTarget?: boolean;
@@ -632,6 +636,8 @@ export function buildMaterializeOccurrencePlan({
 	parentLink,
 	defaultStatus = parentTask.status,
 	defaultPriority = parentTask.priority,
+	completedStatus,
+	skippedStatus,
 	templateTask = {},
 	overrides = {},
 	allowNonGeneratedTarget = true,
@@ -666,6 +672,19 @@ export function buildMaterializeOccurrencePlan({
 		};
 	}
 
+	// The note must agree with the state the parent already records for this date.
+	const recordedCompleted = getStringArray(parentTask.complete_instances).includes(dateStr);
+	const recordedSkipped =
+		!recordedCompleted && getStringArray(parentTask.skipped_instances).includes(dateStr);
+	if (recordedSkipped && !skippedStatus && overrides.status === undefined) {
+		throw new Error("missing_skipped_status");
+	}
+	const recordedStatus = recordedCompleted
+		? completedStatus || "done"
+		: recordedSkipped
+			? skippedStatus
+			: undefined;
+
 	const inheritedTask = buildInheritedOccurrenceTask(parentTask, dateStr);
 	const customProperties = mergeCustomProperties(
 		inheritedTask.customProperties,
@@ -679,7 +698,7 @@ export function buildMaterializeOccurrencePlan({
 		id: undefined,
 		path: undefined,
 		archived: undefined,
-		status: overrides.status ?? templateTask.status ?? defaultStatus,
+		status: overrides.status ?? recordedStatus ?? templateTask.status ?? defaultStatus,
 		priority: overrides.priority ?? templateTask.priority ?? parentTask.priority ?? defaultPriority,
 		scheduled: overrides.scheduled ?? templateTask.scheduled ?? inheritedTask.scheduled ?? dateStr,
 		due: overrides.due ?? templateTask.due ?? inheritedTask.due,
@@ -695,7 +714,7 @@ export function buildMaterializeOccurrencePlan({
 		occurrence_template: undefined,
 		occurrence_past_horizon: undefined,
 		occurrence_future_horizon: undefined,
-		completedDate: undefined,
+		completedDate: recordedCompleted && overrides.status === undefined ? dateStr : undefined,
 		timeEntries: undefined,
 		totalTrackedTime: undefined,
 		icsEventId: undefined,
