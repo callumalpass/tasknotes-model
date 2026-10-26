@@ -69,6 +69,7 @@ export const taskInfoSchema = z.object({
 	assignees: z.array(z.string().regex(/\S/)).optional(),
 	recurrence: z.string().optional(),
 	recurrence_anchor: z.enum(["scheduled", "completion"]).optional(),
+	recurrence_original_date: z.string().optional(),
 	complete_instances: z.array(z.string()).optional(),
 	skipped_instances: z.array(z.string()).optional(),
 	recurrence_parent: z.string().optional(),

@@ -753,7 +753,8 @@
           "scheduled": "2026-03-07T11:00",
           "complete_instances": [],
           "skipped_instances": [],
-          "dateModified": "2026-03-08T16:00:00Z"
+          "dateModified": "2026-03-08T16:00:00Z",
+          "recurrence_original_date": "2026-03-08"
         },
         "expectedFrontmatterPatch": [
           {
@@ -768,6 +769,11 @@
           {
             "op": "delete",
             "field": "skipped_instances"
+          },
+          {
+            "op": "set",
+            "field": "recurrence_original_date",
+            "value": "2026-03-08"
           },
           {
             "op": "set",
@@ -1078,13 +1084,19 @@
         },
         "expectedUpdates": {
           "scheduled": "2026-03-02T12:00",
-          "dateModified": "2026-03-08T16:00:00Z"
+          "dateModified": "2026-03-08T16:00:00Z",
+          "recurrence": "DTSTART:20260302;FREQ=WEEKLY;COUNT=3;BYDAY=MO"
         },
         "expectedFrontmatterPatch": [
           {
             "op": "set",
             "field": "scheduled",
             "value": "2026-03-02T12:00"
+          },
+          {
+            "op": "set",
+            "field": "recurrence",
+            "value": "DTSTART:20260302;FREQ=WEEKLY;COUNT=3;BYDAY=MO"
           },
           {
             "op": "set",
@@ -1329,13 +1341,19 @@
         },
         "expectedUpdates": {
           "scheduled": "2026-03-09T12:00",
-          "dateModified": "2026-03-08T16:00:00Z"
+          "dateModified": "2026-03-08T16:00:00Z",
+          "recurrence_original_date": "2026-03-07"
         },
         "expectedFrontmatterPatch": [
           {
             "op": "set",
             "field": "scheduled",
             "value": "2026-03-09T12:00"
+          },
+          {
+            "op": "set",
+            "field": "recurrence_original_date",
+            "value": "2026-03-07"
           },
           {
             "op": "set",

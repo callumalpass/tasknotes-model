@@ -22,6 +22,7 @@ import {
 	parseLinkToPath,
 	readAssigneeIds,
 	serializeDependencies,
+	toUserField,
 } from "./mapping";
 import type {
 	FieldMapping,
@@ -1318,6 +1319,7 @@ function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof Ta
 		googleCalendarMovedOriginalDates: "googleCalendarMovedOriginalDates",
 		recurrence: "recurrence",
 		recurrence_anchor: "recurrenceAnchor",
+		recurrence_original_date: "recurrenceOriginalDate",
 		complete_instances: "completeInstances",
 		skipped_instances: "skippedInstances",
 		recurrence_parent: "recurrenceParent",
@@ -1333,7 +1335,7 @@ function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof Ta
 		sortOrder: "sortOrder",
 	};
 	const mappingKey = explicit[property];
-	return mappingKey ? fieldMapping[mappingKey] : undefined;
+	return mappingKey ? toUserField(fieldMapping, mappingKey) : undefined;
 }
 
 function isOccurrenceMaterializationMode(value: unknown): value is OccurrenceMaterializationMode {
