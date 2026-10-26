@@ -2587,5 +2587,131 @@
         }
       }
     ]
+  },
+  {
+    "name": "timed-span-moves-by-wall-clock-across-dst",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-10-03T09:00",
+          "due": "2026-10-04T09:00"
+        }
+      ],
+      "settings": {
+        "showScheduledToDueSpan": true
+      },
+      "range": {
+        "start": "2026-09-28",
+        "end": "2026-10-05"
+      },
+      "timezone": "Australia/Melbourne",
+      "now": "2026-09-28T08:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "span-a-2026-10-03",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-10-03T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "span-shift"
+      },
+      {
+        "id": "span-a-2026-10-04",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-10-04T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "span-shift"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "span-a-2026-10-03",
+        "change": {
+          "kind": "drop",
+          "start": "2026-10-04T09:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-10-04T09:00",
+          "due": "2026-10-05T09:00",
+          "dateModified": "2026-09-28T08:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-10-04T09:00"
+          },
+          {
+            "op": "set",
+            "field": "due",
+            "value": "2026-10-05T09:00"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-09-28T08:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      },
+      {
+        "entryId": "span-a-2026-10-03",
+        "change": {
+          "kind": "drop",
+          "start": "2026-10-04",
+          "allDay": true
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-10-04",
+          "due": "2026-10-05",
+          "dateModified": "2026-09-28T08:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-10-04"
+          },
+          {
+            "op": "set",
+            "field": "due",
+            "value": "2026-10-05"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-09-28T08:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
   }
 ]

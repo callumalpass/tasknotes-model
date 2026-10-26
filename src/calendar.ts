@@ -545,14 +545,28 @@ export function planCalendarEdit({
 			? Math.round((end - start) / 86_400_000) * 1440
 			: Math.round((end - start) / 60000);
 	} else if (entry.type === "scheduledToDueSpan") {
-		const delta = start - calendarDateToInstant(entry.start, timezone);
+		// Shift by calendar days and wall-clock minutes, not elapsed time, so a
+		// daylight-saving change inside the span never moves either clock. A drop
+		// on a day (all-day row, month cell) makes both dates date-only.
+		const toDay = change.allDay || change.kind === "drop-on-day";
+		const from = calendarInstantToDate(calendarDateToInstant(entry.start, timezone), timezone, entry.allDay);
+		const days = calendarDaysBetween(from, value);
+		const clock = (civil: string) => Number(civil.slice(11, 13)) * 60 + Number(civil.slice(14, 16));
+		const minutes = !toDay && from.includes("T") ? clock(value) - clock(from) : 0;
 		for (const property of ["scheduled", "due"] as const) {
-			if (task[property])
-				updates[property] = calendarInstantToDate(
-					calendarDateToInstant(task[property]!, timezone) + delta,
-					timezone,
-					!task[property]!.includes("T"),
-				);
+			const current = task[property];
+			if (!current) continue;
+			const civil = calendarInstantToDate(
+				calendarDateToInstant(current, timezone),
+				timezone,
+				!current.includes("T"),
+			);
+			updates[property] =
+				toDay || !civil.includes("T")
+					? addCalendarDays(calendarDay(civil), days)
+					: new Date(Date.parse(`${civil}Z`) + days * 86_400_000 + minutes * 60_000)
+							.toISOString()
+							.slice(0, 16);
 		}
 	} else if (entry.recurringKind === "pattern" && !entry.isMaterializedOccurrence) {
 		if (!task.recurrence) throw new Error("missing-recurrence");
