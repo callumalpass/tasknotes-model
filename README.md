@@ -19,6 +19,7 @@ It intentionally contains no Obsidian API usage, no vault IO, no process exits, 
 - recurrence evaluation and schedule advancement
 - materialized occurrence identity, creation, completion, skip, and parent reconciliation plans
 - time tracking entry planning and duration calculation
+- calendar entry projection, calendar edit plans, and incremental range caching
 - validation helpers
 - host-independent operation plans for common task mutations
 - spec-normalized adapter helpers for CLI and mdbase-style consumers
@@ -50,12 +51,83 @@ The package exports both the root module and focused subpath modules:
 | `@tasknotes/model/schema` | Zod schemas for model validation |
 | `@tasknotes/model/recurrence` | Recurrence evaluation, DTSTART handling, and schedule recalculation |
 | `@tasknotes/model/time` | Time-entry sanitizing, timer plans, and duration totals |
+| `@tasknotes/model/calendar` | Neutral calendar entries, explicit-zone dates, calendar edit plans, and incremental index |
+| `@tasknotes/model/calendar/fixtures` | Typed shared calendar building/editing fixtures (not in the root barrel) |
 | `@tasknotes/model/validation` | Task and time-entry validation |
 | `@tasknotes/model/operations` | Host-independent task mutation planning, including materialized occurrence plans |
 | `@tasknotes/model/frontmatter` | Markdown task document parse/serialize helpers |
 | `@tasknotes/model/mdbase` | Canonical mdbase v0.3 config, contract, schema, and implementing-type generation |
 | `@tasknotes/model/starter` | The published TaskNotes starter type (`tasknotes.task` pack seed), pinned to mdbase-contracts by the test suite. Use it, not the plugin defaults in `defaults`, to build starter types |
 | `@tasknotes/model/conformance` | tasknotes-spec conformance operation dispatcher |
+
+## Calendar contract
+
+```ts
+import { buildCalendarEntries, createCalendarEntryIndex, planCalendarEdit } from "@tasknotes/model/calendar";
+
+const context = {
+	timezone: "America/New_York",
+	now: "2026-03-08T16:00:00Z",
+	settings: { showScheduled: true, showDue: true, showRecurring: true },
+};
+const range = { start: "2026-03-01", end: "2026-04-01" }; // exclusive end
+const entries = buildCalendarEntries({ tasks, range, ...context });
+const index = createCalendarEntryIndex(context);
+index.setTasks(tasks);
+index.upsert(task.id || task.path, task, revision); // revision optional; defaults to dateModified
+const sameEntries = index.entriesInRange(range);
+const plan = planCalendarEdit({
+	task, entry: entries[0],
+	change: { kind: "drop", start: "2026-03-09T11:00", allDay: false },
+	timezone: context.timezone, now: context.now, fieldMapping,
+});
+// After any confirmation: apply plan.frontmatterPatch, or persist plan.updates exactly.
+// Do NOT pass through automatic recurrence-schedule recalculation.
+```
+
+- Inputs are validated task dates, an IANA timezone, and explicit `now`. Date-only and
+  floating datetimes are civil values in that zone; offset values are instants.
+  DST overlaps choose the earlier clock, gaps move forward. Ambiguous duration ends
+  retain an ISO instant. Timed durations are elapsed minutes; all-day durations are
+  nominal calendar days × 1440. Invalid dates/zones/ranges throw.
+- Entries contain no task object, renderer types or colours. Join `taskId` back to
+  the host task/row. Stable IDs prefer task `id`, falling back to `path`. IDs must
+  uniquely identify tasks. `end` is exclusive; absent `end` uses the explicit
+  `durationMinutes` renderer default (60 minutes or one day unless configured).
+- Task visibility settings use the Bases names. Defaults match the plugin:
+  scheduled/due/recurring/time entries and completed/skipped history on, spans and
+  overdue-on-today off. Pass configured completed status values, not status IDs.
+  `calendarView` plus `showAllDaySlot` covers list-specific all-day filtering.
+  Layout/weekends and external/property/timeblock visibility stay with hosts.
+- Scheduled→due all-day spans include the due day. Timed spans are work blocks on
+  each day at the scheduled clock, **not** a single continuous timed interval.
+  Due entries are 30-minute deadline markers clipped to midnight, independent of
+  estimates. Only finished time entries are projected.
+- Recurrence uses the model RRULE implementation with civil occurrence dates.
+  Stored RFC TZID/EXDATE properties are retained; TZID is removed only from parser
+  input to avoid process-zone conversion of occurrence-day anchors. The selected
+  calendar zone determines display clocks. Due stays a standalone deadline rather
+  than being projected on each recurrence date. Materialized children suppress
+  virtual parent occurrences; supply `materializedOccurrences` for children outside
+  the visible task set, keyed by resolved parent task ID.
+- Edit plans mirror plugin gestures: next-occurrence drops reschedule `scheduled`;
+  pattern drops change only DTSTART's clock (preserving its date); recorded drops
+  change the scheduled clock without moving its date. No gesture materializes a
+  note. Pattern all-day/timed changes leave `scheduled` independent. Recurring
+  spans are read-only. Resizes change only the estimate, not `scheduled`/`due`,
+  except time-entry resizes, which replace their range. `clearedInstances` reports
+  completion/skip dates removed by a next-occurrence reschedule, for confirmation.
+- The index caches eight ranges per task by default. Supply immutable task objects
+  or call `upsert` with a changed revision after mutation. `setTasks` preserves
+  cached unchanged objects and updates order/membership; `remove` and materialized
+  child changes update parent suppression. `setContext` invalidates on settings,
+  timezone or materialization changes; `now` changes invalidate only when overdue
+  display uses it. Returned entries can be annotated without corrupting the cache.
+- Shared expectations are available as `calendarFixtures` from
+  `@tasknotes/model/calendar/fixtures` and raw JSON at
+  `@tasknotes/model/fixtures/calendar/scenarios.json`. Every scenario includes full
+  inputs and expected entries; edits include exact model updates and frontmatter
+  patches. Both ESM and CJS consumers can use them without a JSON loader.
 
 ## Examples
 
