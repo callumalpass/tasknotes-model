@@ -1,0 +1,2573 @@
+[
+  {
+    "name": "all-day-estimate-and-same-day-due",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07",
+          "timeEstimate": 1500,
+          "due": "2026-03-07"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07",
+        "allDay": true,
+        "durationMinutes": 2880,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-03-09"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "scheduled-a",
+        "change": {
+          "kind": "resize",
+          "start": "2026-03-07",
+          "allDay": true,
+          "end": "2026-03-10"
+        },
+        "expectedUpdates": {
+          "timeEstimate": 4320,
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "timeEstimate",
+            "value": 4320
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      },
+      {
+        "entryId": "scheduled-a",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-08T11:15",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-03-08T11:15",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-03-08T11:15"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "overnight-and-deadline",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T23:30",
+          "timeEstimate": 120,
+          "due": "2026-03-08T23:50"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T23:30",
+        "allDay": false,
+        "durationMinutes": 120,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-03-08T01:30"
+      },
+      {
+        "id": "due-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "due",
+        "start": "2026-03-08T23:50",
+        "allDay": false,
+        "durationMinutes": 10,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "deadline-marker",
+        "end": "2026-03-09T00:00"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "due-a",
+        "change": {
+          "kind": "drop-on-day",
+          "start": "2026-03-12",
+          "allDay": true
+        },
+        "expectedUpdates": {
+          "due": "2026-03-12",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "due",
+            "value": "2026-03-12"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      },
+      {
+        "entryId": "scheduled-a",
+        "change": {
+          "kind": "resize",
+          "start": "2026-03-07T23:45",
+          "allDay": false,
+          "end": "2026-03-08T01:30"
+        },
+        "expectedUpdates": {
+          "timeEstimate": 105,
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "timeEstimate",
+            "value": 105
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "due-only",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "due": "2026-03-11"
+        }
+      ],
+      "settings": {
+        "showScheduled": false
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "due-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "due",
+        "start": "2026-03-11",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "deadline-marker"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "implicit-timed-duration",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-11T10:00"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-11T10:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "scheduled-a",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-15",
+          "allDay": true
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-03-15",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-03-15"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "inclusive-all-day-span",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07",
+          "due": "2026-03-10"
+        }
+      ],
+      "settings": {
+        "showScheduledToDueSpan": true
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "span-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-07",
+        "allDay": true,
+        "durationMinutes": 5760,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "span-shift",
+        "end": "2026-03-11"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "span-a",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-09",
+          "allDay": true
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-03-09",
+          "due": "2026-03-12",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-03-09"
+          },
+          {
+            "op": "set",
+            "field": "due",
+            "value": "2026-03-12"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "timed-span-is-daily-work-not-continuous",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "due": "2026-03-09T17:00",
+          "timeEstimate": 45
+        }
+      ],
+      "settings": {
+        "showScheduledToDueSpan": true
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "span-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-07T09:00",
+        "allDay": false,
+        "durationMinutes": 45,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "span-shift",
+        "end": "2026-03-07T09:45"
+      },
+      {
+        "id": "span-a-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 45,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "span-shift",
+        "end": "2026-03-08T09:45"
+      },
+      {
+        "id": "span-a-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-09T09:00",
+        "allDay": false,
+        "durationMinutes": 45,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "span-shift",
+        "end": "2026-03-09T09:45"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "spring-forward-elapsed-duration",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-08T01:30",
+          "timeEstimate": 120
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-08",
+        "end": "2026-03-09"
+      },
+      "timezone": "America/New_York",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-08T01:30",
+        "allDay": false,
+        "durationMinutes": 120,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-03-08T04:30"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "scheduled-a",
+        "change": {
+          "kind": "resize",
+          "start": "2026-03-08T01:30",
+          "allDay": false,
+          "end": "2026-03-08T04:30"
+        },
+        "expectedUpdates": {
+          "timeEstimate": 120,
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "timeEstimate",
+            "value": 120
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "fall-back-elapsed-duration",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-11-01T00:30",
+          "timeEstimate": 180
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-11-01",
+        "end": "2026-11-02"
+      },
+      "timezone": "America/New_York",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-11-01T00:30",
+        "allDay": false,
+        "durationMinutes": 180,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-11-01T02:30"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "positive-timezone-visible-range",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T23:30",
+          "timeEstimate": 120
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-07T11:00:00Z",
+        "end": "2026-03-08T11:00:00Z"
+      },
+      "timezone": "Pacific/Auckland",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T23:30",
+        "allDay": false,
+        "durationMinutes": 120,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-03-08T01:30"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "daily-next-pattern-and-instance-state",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-08T09:00",
+          "recurrence": "DTSTART:20260307T100000Z;FREQ=DAILY;COUNT=4",
+          "complete_instances": [
+            "2026-03-07"
+          ],
+          "skipped_instances": [
+            "2026-03-09"
+          ],
+          "timeEstimate": 30
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "Europe/London",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "end": "2026-03-08T09:30",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-07T10:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": true,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "end": "2026-03-07T10:30",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "10:00"
+      },
+      {
+        "id": "recurring-a-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-09T10:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": true,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "end": "2026-03-09T10:30",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-09",
+        "recurringTemplateTime": "10:00"
+      },
+      {
+        "id": "recurring-a-2026-03-10",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-10T10:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "end": "2026-03-10T10:30",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-10",
+        "recurringTemplateTime": "10:00"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "next-scheduled-a-2026-03-08",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-07T11:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-03-07T11:00",
+          "complete_instances": [],
+          "skipped_instances": [],
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-03-07T11:00"
+          },
+          {
+            "op": "delete",
+            "field": "complete_instances"
+          },
+          {
+            "op": "delete",
+            "field": "skipped_instances"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [
+            "2026-03-07"
+          ],
+          "skipped": [
+            "2026-03-09"
+          ]
+        }
+      },
+      {
+        "entryId": "recurring-a-2026-03-09",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-15T14:15",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "recurrence": "DTSTART:20260307T141500Z;FREQ=DAILY;COUNT=4",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "recurrence",
+            "value": "DTSTART:20260307T141500Z;FREQ=DAILY;COUNT=4"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      },
+      {
+        "entryId": "recurring-a-2026-03-07",
+        "change": {
+          "kind": "resize",
+          "start": "2026-03-07T10:00",
+          "allDay": false,
+          "end": "2026-03-07T11:30"
+        },
+        "expectedUpdates": {
+          "timeEstimate": 90,
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "timeEstimate",
+            "value": 90
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      },
+      {
+        "entryId": "recurring-a-2026-03-09",
+        "change": {
+          "kind": "drop-on-day",
+          "start": "2026-03-22",
+          "allDay": true
+        },
+        "expectedUpdates": {
+          "recurrence": "DTSTART:20260307;FREQ=DAILY;COUNT=4",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "recurrence",
+            "value": "DTSTART:20260307;FREQ=DAILY;COUNT=4"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "hide-processed-daily-instances",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-08T09:00",
+          "recurrence": "DTSTART:20260307T100000Z;FREQ=DAILY;COUNT=4",
+          "complete_instances": [
+            "2026-03-07"
+          ],
+          "skipped_instances": [
+            "2026-03-09"
+          ],
+          "timeEstimate": 30
+        }
+      ],
+      "settings": {
+        "showCompletedRecurringInstances": false,
+        "showSkippedRecurringInstances": false
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "end": "2026-03-08T09:30",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-10",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-10T10:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "end": "2026-03-10T10:30",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-10",
+        "recurringTemplateTime": "10:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "weekly-recorded-off-pattern-and-add-dtstart",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-02",
+          "recurrence": "FREQ=WEEKLY;COUNT=3;BYDAY=MO",
+          "complete_instances": [
+            "2026-03-05"
+          ]
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-02",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-02",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-02",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-09",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-09",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-16",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-16",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-16",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-recorded-a-2026-03-05",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-05",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": true,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "recorded-time",
+        "recurringKind": "recorded",
+        "instanceDate": "2026-03-05",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "recurring-a-2026-03-09",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-13T16:45",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "recurrence": "DTSTART:20260302T164500Z;FREQ=WEEKLY;COUNT=3;BYDAY=MO",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "recurrence",
+            "value": "DTSTART:20260302T164500Z;FREQ=WEEKLY;COUNT=3;BYDAY=MO"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      },
+      {
+        "entryId": "recurring-recorded-a-2026-03-05",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-23T12:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-03-02T12:00",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-03-02T12:00"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "recorded-only-when-projections-disabled",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-02",
+          "recurrence": "FREQ=WEEKLY;COUNT=3;BYDAY=MO",
+          "complete_instances": [
+            "2026-03-05"
+          ]
+        }
+      ],
+      "settings": {
+        "showRecurring": false,
+        "showScheduled": false,
+        "showDue": false
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "recurring-recorded-a-2026-03-05",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-05",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": true,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "recorded-time",
+        "recurringKind": "recorded",
+        "instanceDate": "2026-03-05",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "monthly-skips-missing-month-day",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-01-31",
+          "recurrence": "DTSTART:20260131;FREQ=MONTHLY;COUNT=3"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-02-01",
+        "end": "2026-06-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "recurring-a-2026-03-31",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-31",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-31",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-05-31",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-05-31",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-05-31",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "recurring-spans-readonly",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07",
+          "due": "2026-03-09",
+          "recurrence": "DTSTART:20260307;FREQ=WEEKLY;COUNT=2"
+        }
+      ],
+      "settings": {
+        "showScheduledToDueSpan": true
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "span-next-scheduled-a-2026-03-07-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-07",
+        "allDay": true,
+        "durationMinutes": 4320,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": false,
+        "durationEditable": false,
+        "editReason": "recurring-span-readonly",
+        "end": "2026-03-10",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "span-pattern-a-2026-03-14-2026-03-14",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-14",
+        "allDay": true,
+        "durationMinutes": 4320,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": false,
+        "durationEditable": false,
+        "editReason": "recurring-span-readonly",
+        "end": "2026-03-17",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-14",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "rfc-dtstart-edit-preserves-lines",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "recurrence": "DTSTART:20260307T090000Z\nRRULE:FREQ=DAILY;COUNT=2\nEXDATE:20260308T090000Z"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "next-scheduled-a-2026-03-07",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-09T12:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-03-09T12:00",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-03-09T12:00"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "rfc-pattern-edit-preserves-rule",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "recurrence": "DTSTART:20260307T090000Z\nRRULE:FREQ=DAILY;COUNT=2"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "recurring-a-2026-03-08",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-15T13:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "recurrence": "DTSTART:20260307T130000Z\nRRULE:FREQ=DAILY;COUNT=2",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "recurrence",
+            "value": "DTSTART:20260307T130000Z\nRRULE:FREQ=DAILY;COUNT=2"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "finished-time-entries-exclusive-boundary-and-edits",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "timeEntries": [
+            {
+              "startTime": "2026-03-07T12:00:00Z",
+              "endTime": "2026-03-07T13:00:00Z",
+              "duration": 999,
+              "description": "focus"
+            },
+            {
+              "startTime": "2026-03-08T12:00:00Z"
+            },
+            {
+              "startTime": "2026-03-01T00:00:00Z",
+              "endTime": "2026-03-02T00:00:00Z"
+            }
+          ]
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-02",
+        "end": "2026-03-09"
+      },
+      "timezone": "America/Los_Angeles",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "timeentry-a-0",
+        "taskId": "a",
+        "title": "A",
+        "type": "timeEntry",
+        "start": "2026-03-07T12:00:00Z",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "time-entry",
+        "end": "2026-03-07T13:00:00Z",
+        "timeEntryIndex": 0
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "timeentry-a-0",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-07T06:00",
+          "allDay": false,
+          "end": "2026-03-07T07:00"
+        },
+        "expectedUpdates": {
+          "timeEntries": [
+            {
+              "startTime": "2026-03-07T14:00:00.000Z",
+              "endTime": "2026-03-07T15:00:00.000Z",
+              "description": "focus"
+            },
+            {
+              "startTime": "2026-03-08T12:00:00Z"
+            },
+            {
+              "startTime": "2026-03-01T00:00:00Z",
+              "endTime": "2026-03-02T00:00:00Z"
+            }
+          ],
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "timeEntries",
+            "value": [
+              {
+                "startTime": "2026-03-07T14:00:00.000Z",
+                "endTime": "2026-03-07T15:00:00.000Z",
+                "description": "focus"
+              },
+              {
+                "startTime": "2026-03-08T12:00:00Z"
+              },
+              {
+                "startTime": "2026-03-01T00:00:00Z",
+                "endTime": "2026-03-02T00:00:00Z"
+              }
+            ]
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      },
+      {
+        "entryId": "timeentry-a-0",
+        "change": {
+          "kind": "resize",
+          "start": "2026-03-07T04:15",
+          "allDay": false,
+          "end": "2026-03-07T05:30"
+        },
+        "expectedUpdates": {
+          "timeEntries": [
+            {
+              "startTime": "2026-03-07T12:15:00.000Z",
+              "endTime": "2026-03-07T13:30:00.000Z",
+              "description": "focus"
+            },
+            {
+              "startTime": "2026-03-08T12:00:00Z"
+            },
+            {
+              "startTime": "2026-03-01T00:00:00Z",
+              "endTime": "2026-03-02T00:00:00Z"
+            }
+          ],
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "timeEntries",
+            "value": [
+              {
+                "startTime": "2026-03-07T12:15:00.000Z",
+                "endTime": "2026-03-07T13:30:00.000Z",
+                "description": "focus"
+              },
+              {
+                "startTime": "2026-03-08T12:00:00Z"
+              },
+              {
+                "startTime": "2026-03-01T00:00:00Z",
+                "endTime": "2026-03-02T00:00:00Z"
+              }
+            ]
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "materialized-child-suppresses-parent",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07",
+          "recurrence": "DTSTART:20260307;FREQ=DAILY;COUNT=3"
+        },
+        {
+          "id": "b",
+          "path": "b.md",
+          "title": "B",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-08T11:00",
+          "recurrence_parent": "[[a]]",
+          "occurrence_date": "2026-03-08"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-09",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-09",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "scheduled-b",
+        "taskId": "b",
+        "title": "B",
+        "type": "scheduled",
+        "start": "2026-03-08T11:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "isMaterializedOccurrence": true,
+        "instanceDate": "2026-03-08",
+        "occurrenceParent": "[[a]]"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "external-materialized-identities",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07",
+          "recurrence": "DTSTART:20260307;FREQ=DAILY;COUNT=3"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z",
+      "materializedOccurrences": {
+        "a": [
+          "2026-03-08"
+        ]
+      }
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-09",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-09",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "overdue-on-today-suppresses-date-only-due",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-01T10:00",
+          "due": "2026-03-02",
+          "timeEstimate": 90
+        }
+      ],
+      "settings": {
+        "showOverdueOnToday": true
+      },
+      "range": {
+        "start": "2026-03-08",
+        "end": "2026-03-09"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a-overdue-today",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-08T10:00",
+        "allDay": false,
+        "durationMinutes": 90,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-03-08T11:30",
+        "isOverdueOnToday": true
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "moved-original-dates-not-reprojected",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "recurrence": "DTSTART:20260307T090000Z;FREQ=DAILY;COUNT=2",
+          "googleCalendarExceptionOriginalScheduled": "2026-03-06",
+          "googleCalendarMovedOriginalDates": [
+            "2026-03-08"
+          ]
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "fall-back-ambiguous-end-retains-instant",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-11-01T00:30",
+          "timeEstimate": 120
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-11-01",
+        "end": "2026-11-02"
+      },
+      "timezone": "America/New_York",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-11-01T00:30",
+        "allDay": false,
+        "durationMinutes": 120,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-11-01T06:30:00.000Z"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "all-day-dst-is-a-calendar-day",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-08",
+          "timeEstimate": 1440
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-08",
+        "end": "2026-03-09"
+      },
+      "timezone": "America/New_York",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "scheduled-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-08",
+        "allDay": true,
+        "durationMinutes": 1440,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "date",
+        "end": "2026-03-09"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "rfc-tzid-expands-civil-occurrence-dates",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T23:30",
+          "recurrence": "DTSTART;TZID=America/New_York:20260307T233000\nRRULE:FREQ=DAILY;COUNT=3"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-07",
+        "end": "2026-03-12"
+      },
+      "timezone": "America/New_York",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T23:30",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "23:30"
+      },
+      {
+        "id": "recurring-a-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-08T23:30",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "23:30"
+      },
+      {
+        "id": "recurring-a-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-09T23:30",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-09",
+        "recurringTemplateTime": "23:30"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "recurring-a-2026-03-08",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-15T15:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "recurrence": "DTSTART;TZID=America/New_York:20260307T150000\nRRULE:FREQ=DAILY;COUNT=3",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "recurrence",
+            "value": "DTSTART;TZID=America/New_York:20260307T150000\nRRULE:FREQ=DAILY;COUNT=3"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "recurring-half-day-range",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "recurrence": "DTSTART:20260307T090000Z;FREQ=DAILY;COUNT=3"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-09T08:00",
+        "end": "2026-03-09T12:00"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "recurring-a-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-09T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-09",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "reschedule-tracks-provider-original-date",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "recurrence": "DTSTART:20260307T090000Z;FREQ=DAILY;COUNT=2",
+          "googleCalendarEventId": "remote"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "next-scheduled-a-2026-03-07",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-09T11:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "scheduled": "2026-03-09T11:00",
+          "googleCalendarExceptionOriginalScheduled": "2026-03-07",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "scheduled",
+            "value": "2026-03-09T11:00"
+          },
+          {
+            "op": "set",
+            "field": "googleCalendarExceptionOriginalScheduled",
+            "value": "2026-03-07"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "exclusive-range-boundaries",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T23:00",
+          "timeEstimate": 60,
+          "timeEntries": [
+            {
+              "startTime": "2026-03-07T23:00:00Z",
+              "endTime": "2026-03-08T00:00:00Z"
+            },
+            {
+              "startTime": "2026-03-09T00:00:00Z",
+              "endTime": "2026-03-09T01:00:00Z"
+            }
+          ]
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-08",
+        "end": "2026-03-09"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [],
+    "edits": []
+  },
+  {
+    "name": "recurring-due-remains-standalone-deadline",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "due": "2026-03-10T17:00",
+          "recurrence": "DTSTART:20260307T090000Z;FREQ=DAILY;COUNT=2"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-07T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "recurring-a-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "due-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "due",
+        "start": "2026-03-10T17:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "deadline-marker",
+        "end": "2026-03-10T17:30"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "bases-list-all-day-slot-off",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07",
+          "due": "2026-03-08T12:00"
+        }
+      ],
+      "settings": {
+        "calendarView": "listWeek",
+        "showAllDaySlot": false
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "due-a",
+        "taskId": "a",
+        "title": "A",
+        "type": "due",
+        "start": "2026-03-08T12:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": false,
+        "editReason": "deadline-marker",
+        "end": "2026-03-08T12:30"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "recurring-timed-spans-keep-occurrence-identities",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00",
+          "due": "2026-03-08T17:00",
+          "recurrence": "DTSTART:20260307T090000Z;FREQ=DAILY;COUNT=2",
+          "timeEstimate": 30
+        }
+      ],
+      "settings": {
+        "showScheduledToDueSpan": true
+      },
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "span-next-scheduled-a-2026-03-07-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-07T09:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": false,
+        "durationEditable": false,
+        "editReason": "recurring-span-readonly",
+        "end": "2026-03-07T09:30",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "span-next-scheduled-a-2026-03-07-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": false,
+        "durationEditable": false,
+        "editReason": "recurring-span-readonly",
+        "end": "2026-03-08T09:30",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "span-pattern-a-2026-03-08-2026-03-08",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-08T09:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": false,
+        "durationEditable": false,
+        "editReason": "recurring-span-readonly",
+        "end": "2026-03-08T09:30",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "09:00"
+      },
+      {
+        "id": "span-pattern-a-2026-03-08-2026-03-09",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduledToDueSpan",
+        "start": "2026-03-09T09:00",
+        "allDay": false,
+        "durationMinutes": 30,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": false,
+        "durationEditable": false,
+        "editReason": "recurring-span-readonly",
+        "end": "2026-03-09T09:30",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-08",
+        "recurringTemplateTime": "09:00"
+      }
+    ],
+    "edits": []
+  },
+  {
+    "name": "configured-completed-statuses-hide-overdue",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "finished",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-07T09:00"
+        }
+      ],
+      "settings": {
+        "completedStatuses": [
+          "finished"
+        ],
+        "showOverdueOnToday": true
+      },
+      "range": {
+        "start": "2026-03-08",
+        "end": "2026-03-09"
+      },
+      "timezone": "UTC",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [],
+    "edits": []
+  },
+  {
+    "name": "canonical-instant-recurring-anchor-is-local-day",
+    "input": {
+      "tasks": [
+        {
+          "id": "a",
+          "path": "a.md",
+          "title": "A",
+          "status": "open",
+          "priority": "normal",
+          "archived": false,
+          "scheduled": "2026-03-08T04:30:00Z",
+          "due": "2026-03-07",
+          "recurrence": "FREQ=WEEKLY;COUNT=2"
+        }
+      ],
+      "settings": {},
+      "range": {
+        "start": "2026-03-01",
+        "end": "2026-04-01"
+      },
+      "timezone": "America/New_York",
+      "now": "2026-03-08T16:00:00Z"
+    },
+    "expectedEntries": [
+      {
+        "id": "next-scheduled-a-2026-03-07",
+        "taskId": "a",
+        "title": "A",
+        "type": "scheduled",
+        "start": "2026-03-08T04:30:00Z",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "next-occurrence",
+        "recurringKind": "next-scheduled",
+        "instanceDate": "2026-03-07",
+        "recurringTemplateTime": "23:30"
+      },
+      {
+        "id": "recurring-a-2026-03-14",
+        "taskId": "a",
+        "title": "A",
+        "type": "recurring",
+        "start": "2026-03-14T23:30",
+        "allDay": false,
+        "durationMinutes": 60,
+        "isCompleted": false,
+        "isSkipped": false,
+        "startEditable": true,
+        "durationEditable": true,
+        "editReason": "series-time",
+        "recurringKind": "pattern",
+        "instanceDate": "2026-03-14",
+        "recurringTemplateTime": "23:30"
+      }
+    ],
+    "edits": [
+      {
+        "entryId": "recurring-a-2026-03-14",
+        "change": {
+          "kind": "drop",
+          "start": "2026-03-15T17:00",
+          "allDay": false
+        },
+        "expectedUpdates": {
+          "recurrence": "DTSTART:20260307T170000Z;FREQ=WEEKLY;COUNT=2",
+          "dateModified": "2026-03-08T16:00:00Z"
+        },
+        "expectedFrontmatterPatch": [
+          {
+            "op": "set",
+            "field": "recurrence",
+            "value": "DTSTART:20260307T170000Z;FREQ=WEEKLY;COUNT=2"
+          },
+          {
+            "op": "set",
+            "field": "dateModified",
+            "value": "2026-03-08T16:00:00Z"
+          }
+        ],
+        "expectedClearedInstances": {
+          "complete": [],
+          "skipped": []
+        }
+      }
+    ]
+  }
+]

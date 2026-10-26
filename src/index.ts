@@ -13,3 +13,4 @@ export * from "./frontmatter";
 export * from "./mdbase";
 export * from "./starter";
 export * from "./conformance";
+export * from "./calendar";

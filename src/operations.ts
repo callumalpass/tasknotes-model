@@ -1314,6 +1314,8 @@ function fieldNameForTaskProperty(fieldMapping: FieldMapping, property: keyof Ta
 		completedDate: "completedDate",
 		dateCreated: "dateCreated",
 		dateModified: "dateModified",
+		googleCalendarExceptionOriginalScheduled: "googleCalendarExceptionOriginalScheduled",
+		googleCalendarMovedOriginalDates: "googleCalendarMovedOriginalDates",
 		recurrence: "recurrence",
 		recurrence_anchor: "recurrenceAnchor",
 		complete_instances: "completeInstances",
