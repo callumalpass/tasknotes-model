@@ -18,6 +18,8 @@ const entries = [
 	"mdbase",
 	"starter",
 	"conformance",
+	"calendar",
+	"calendar-fixtures",
 ];
 
 const external = ["rrule", "yaml", "zod"];

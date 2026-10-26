@@ -1,6 +1,6 @@
 {
 	"name": "@tasknotes/model",
-	"version": "0.3.0-rc.16",
+	"version": "0.3.0-rc.17",
 	"description": "TaskNotes model, mapping, validation, recurrence, and operation-planning reference implementation.",
 	"license": "MIT",
 	"type": "module",
@@ -17,6 +17,9 @@
 	"types": "./dist/types/index.d.ts",
 	"typesVersions": {
 		"*": {
+			"calendar/fixtures": [
+				"dist/types/calendar-fixtures.d.ts"
+			],
 			"dist/types/index.d.ts": [
 				"dist/types/index.d.ts"
 			],
@@ -101,6 +104,17 @@
 			"import": "./dist/esm/starter.js",
 			"require": "./dist/cjs/starter.cjs"
 		},
+		"./calendar": {
+			"types": "./dist/types/calendar.d.ts",
+			"import": "./dist/esm/calendar.js",
+			"require": "./dist/cjs/calendar.cjs"
+		},
+		"./calendar/fixtures": {
+			"types": "./dist/types/calendar-fixtures.d.ts",
+			"import": "./dist/esm/calendar-fixtures.js",
+			"require": "./dist/cjs/calendar-fixtures.cjs"
+		},
+		"./fixtures/calendar/*": "./fixtures/calendar/*",
 		"./conformance": {
 			"types": "./dist/types/conformance.d.ts",
 			"import": "./dist/esm/conformance.js",
@@ -109,6 +123,7 @@
 	},
 	"files": [
 		"dist",
+		"fixtures/calendar",
 		"README.md",
 		"LICENSE"
 	],
@@ -120,6 +135,7 @@
 		"sync:mdbase-contract": "node scripts/sync-tasknotes-contract.mjs",
 		"build": "npm run clean && node scripts/build.mjs && tsc -p tsconfig.types.json",
 		"prepack": "npm run build",
+		"typecheck": "tsc -p tsconfig.types.json --emitDeclarationOnly false --noEmit",
 		"test": "npm run build && node --test test/**/*.test.mjs",
 		"test:package": "node scripts/smoke-package.mjs"
 	},
