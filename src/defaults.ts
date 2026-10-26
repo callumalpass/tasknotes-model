@@ -21,6 +21,7 @@ export const DEFAULT_FIELD_MAPPING: FieldMapping = {
 	dateModified: "dateModified",
 	recurrence: "recurrence",
 	recurrenceAnchor: "recurrence_anchor",
+	recurrenceOriginalDate: "recurrence_original_date",
 	recurrenceParent: "recurrence_parent",
 	occurrenceDate: "occurrence_date",
 	occurrenceMaterialization: "occurrence_materialization",

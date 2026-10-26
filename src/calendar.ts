@@ -1,4 +1,5 @@
-import { generateRecurringInstances } from "./recurrence.js";
+import { addDTSTARTToRecurrenceRule, generateRecurringInstances } from "./recurrence.js";
+import { normalizeRecurrenceOriginalDate } from "./mapping.js";
 import { normalizeTaskReference, taskInfoUpdatesToFrontmatterPatch } from "./operations.js";
 import type { FieldMapping, TaskInfo, TaskOperationPlan, TaskUpdateInput } from "./types.js";
 import {
@@ -278,6 +279,10 @@ function buildTaskEntries(
 		(s.showRecurring || s.showCompletedRecurringInstances || s.showSkippedRecurringInstances)
 	) {
 		const nextDate = dayOf(task.scheduled);
+		const nextIdentity =
+			(task.recurrence_anchor || "scheduled") === "scheduled"
+				? normalizeRecurrenceOriginalDate(task.recurrence_original_date) || nextDate
+				: nextDate;
 		const dtstartTime = /DTSTART(?:;[^:\r\n]+)?:\d{8}T(\d{2})(\d{2})/.exec(task.recurrence);
 		const templateTime = dtstartTime
 			? `${dtstartTime[1]}:${dtstartTime[2]}`
@@ -291,11 +296,12 @@ function buildTaskEntries(
 			-Math.max(spanOffset || 0, Math.ceil((task.timeEstimate || 0) / 1440)),
 		);
 		const moved = new Set(task.googleCalendarMovedOriginalDates || []);
+		if (nextIdentity !== nextDate) moved.add(nextIdentity);
 		if (task.googleCalendarExceptionOriginalScheduled)
 			moved.add(calendarDay(task.googleCalendarExceptionOriginalScheduled));
-		const dates = new Map<string, CalendarRecurringKind>();
+		const dates: Array<[string, CalendarRecurringKind]> = [];
 		if (s.showRecurring) {
-			dates.set(nextDate, "next-scheduled");
+			dates.push([nextIdentity, "next-scheduled"]);
 			// Date-only bounds avoid every process-local date parser in recurrence.ts.
 			// RRULE dates are civil anchors, like scheduled/complete_instances. rrule's
 			// TZID conversion depends on the process zone and may shift the anchor day.
@@ -311,20 +317,22 @@ function buildTaskEntries(
 				new Date(`${endDay}T00:00:00Z`),
 			)) {
 				const day = date.toISOString().slice(0, 10);
-				if (day >= searchStart && day < endDay && day !== nextDate && !moved.has(day))
-					dates.set(day, "pattern");
+				if (day >= searchStart && day < endDay && day !== nextIdentity && !moved.has(day))
+					dates.push([day, "pattern"]);
 			}
 		}
 		for (const day of [
 			...(s.showCompletedRecurringInstances ? task.complete_instances || [] : []),
 			...(s.showSkippedRecurringInstances ? task.skipped_instances || [] : []),
 		].sort()) {
-			if (day >= startDay && day < endDay && !dates.has(day)) dates.set(day, "recorded");
+			if (day >= searchStart && day < endDay) dates.push([day, "recorded"]);
 		}
+		const emitted = new Set<string>();
 		for (const [day, kind] of dates) {
 			const completed = !!task.complete_instances?.includes(day);
 			const skipped = !!task.skipped_instances?.includes(day);
 			if (
+				emitted.has(day) ||
 				materialized.has(day) ||
 				(kind !== "recorded" &&
 					((completed && !s.showCompletedRecurringInstances) ||
@@ -339,11 +347,12 @@ function buildTaskEntries(
 					: timed(task.scheduled)
 						? `${day}T${clock}`
 						: day;
+			const placementDay = kind === "next-scheduled" ? nextDate : day;
 			const recurringEntries =
 				spanOffset !== null && task.due
 					? spans(
 							start,
-							`${addCalendarDays(day, spanOffset)}${timed(task.due) ? `T${civil(task.due).slice(11, 16)}` : ""}`,
+							`${addCalendarDays(placementDay, spanOffset)}${timed(task.due) ? `T${civil(task.due).slice(11, 16)}` : ""}`,
 						)
 					: [scheduled(start)];
 			for (const entry of recurringEntries) {
@@ -368,7 +377,10 @@ function buildTaskEntries(
 								? "series-time"
 								: "recorded-time",
 				});
-				if (visible(entry)) generated.push(entry);
+				if (visible(entry)) {
+					generated.push(entry);
+					emitted.add(day);
+				}
 			}
 		}
 		entries.push(...generated);
@@ -607,6 +619,56 @@ export function planCalendarEdit({
 		if (original)
 			updates.googleCalendarExceptionOriginalScheduled =
 				calendarDay(updates.scheduled) !== original ? original : undefined;
+	}
+	// A calendar move changes the pending placement, not the native rule identity.
+	// Freeze DTSTART against the old cursor before it can become the new seed.
+	if (updates.scheduled && updates.scheduled !== task.scheduled && task.recurrence) {
+		const originalCivilTask = {
+			...task,
+			scheduled: task.scheduled
+				? calendarInstantToDate(
+						calendarDateToInstant(task.scheduled, timezone),
+						timezone,
+						!task.scheduled.includes("T"),
+					)
+				: undefined,
+		};
+		if (!/DTSTART(?:;[^:\r\n]+)?:/.test(task.recurrence)) {
+			const pinned = addDTSTARTToRecurrenceRule(originalCivilTask);
+			if (pinned) updates.recurrence = pinned;
+		}
+		if ((task.recurrence_anchor || "scheduled") === "scheduled") {
+			const previous = task.scheduled ? dayOf(task.scheduled) : "";
+			const next = dayOf(updates.scheduled);
+			if (previous !== next) {
+				let original = normalizeRecurrenceOriginalDate(task.recurrence_original_date);
+				if (!original && !tracksException && previous) {
+					const target = new Date(`${previous}T00:00:00Z`);
+					const occurrences = generateRecurringInstances(
+						{
+							...originalCivilTask,
+							recurrence: task.recurrence.replace(/;TZID=[^:;\r\n]+/g, ""),
+						},
+						target,
+						target,
+					);
+					if (occurrences.some((date) => date.toISOString().slice(0, 10) === previous))
+						original = previous;
+				}
+				if (task.recurrence_original_date || original) {
+					updates.recurrence_original_date = original && next !== original ? original : undefined;
+				}
+			}
+		} else if (task.recurrence_original_date) {
+			updates.recurrence_original_date = undefined;
+		}
+	} else if (
+		updates.recurrence !== undefined &&
+		updates.recurrence !== task.recurrence &&
+		task.recurrence_original_date
+	) {
+		// Pattern/DTSTART edits establish a new series contract.
+		updates.recurrence_original_date = undefined;
 	}
 	updates.dateModified = now;
 	return {

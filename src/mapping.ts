@@ -1,6 +1,6 @@
 import { DEFAULT_FIELD_MAPPING, DEFAULT_PRIORITIES, DEFAULT_STATUSES } from "./defaults";
 import { normalizeAttachmentList } from "./attachments";
-import { validateCompleteInstances } from "./date";
+import { validateCompleteInstances, validateDateString } from "./date";
 import type {
 	FieldMapping,
 	FieldMappingKey,
@@ -23,7 +23,33 @@ export const VALID_DEPENDENCY_RELTYPES: TaskDependencyRelType[] = [
 	"STARTTOFINISH",
 ];
 
+export const DEFAULT_RECURRENCE_ORIGINAL_DATE_PROPERTY = "recurrence_original_date";
+
+function withResolvedMapping(mapping: FieldMapping): FieldMapping & { recurrenceOriginalDate: string } {
+	return {
+		...mapping,
+		recurrenceOriginalDate: toUserField(mapping, "recurrenceOriginalDate"),
+	};
+}
+
+/** Only real, strict calendar dates may become occurrence identities. */
+export function normalizeRecurrenceOriginalDate(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const trimmed = value.trim();
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return undefined;
+	try {
+		return validateDateString(trimmed);
+	} catch {
+		return undefined;
+	}
+}
+
 export function toUserField(mapping: FieldMapping, internalName: FieldMappingKey): string {
+	if (internalName === "recurrenceOriginalDate") {
+		return typeof mapping.recurrenceOriginalDate === "string"
+			? mapping.recurrenceOriginalDate
+			: DEFAULT_RECURRENCE_ORIGINAL_DATE_PROPERTY;
+	}
 	return mapping[internalName];
 }
 
@@ -141,6 +167,8 @@ export function mapTaskFromFrontmatter(
 	if (frontmatter[mapping.recurrence] !== undefined) {
 		mapped.recurrence = normalizeStringValue(frontmatter[mapping.recurrence]);
 	}
+	const originalDate = normalizeRecurrenceOriginalDate(frontmatter[toUserField(mapping, "recurrenceOriginalDate")]);
+	if (originalDate) mapped.recurrence_original_date = originalDate;
 	if (frontmatter[mapping.recurrenceAnchor] !== undefined) {
 		const anchorValue = frontmatter[mapping.recurrenceAnchor];
 		if (anchorValue === "scheduled" || anchorValue === "completion") {
@@ -279,6 +307,8 @@ export function mapTaskToFrontmatter(
 	if (taskData.timeEstimate !== undefined) frontmatter[mapping.timeEstimate] = taskData.timeEstimate;
 	if (taskData.completedDate !== undefined) frontmatter[mapping.completedDate] = taskData.completedDate;
 	if (taskData.recurrence !== undefined) frontmatter[mapping.recurrence] = taskData.recurrence;
+	const originalDate = normalizeRecurrenceOriginalDate(taskData.recurrence_original_date);
+	if (originalDate) frontmatter[toUserField(mapping, "recurrenceOriginalDate")] = originalDate;
 	if (taskData.recurrence_anchor !== undefined) frontmatter[mapping.recurrenceAnchor] = taskData.recurrence_anchor;
 	if (taskData.recurrence_parent !== undefined) frontmatter[mapping.recurrenceParent] = taskData.recurrence_parent;
 	if (taskData.occurrence_date !== undefined) frontmatter[mapping.occurrenceDate] = taskData.occurrence_date;
@@ -370,7 +400,7 @@ export function lookupMappingKey(
 	mapping: FieldMapping,
 	frontmatterPropertyName: string
 ): FieldMappingKey | null {
-	for (const [mappingKey, propertyName] of Object.entries(mapping)) {
+	for (const [mappingKey, propertyName] of Object.entries(withResolvedMapping(mapping))) {
 		if (propertyName === frontmatterPropertyName) {
 			return mappingKey as FieldMappingKey;
 		}
@@ -387,22 +417,23 @@ export function isPropertyForField(
 	propertyName: string,
 	internalField: FieldMappingKey
 ): boolean {
-	return mapping[internalField] === propertyName;
+	return toUserField(mapping, internalField) === propertyName;
 }
 
 export function toUserFields(mapping: FieldMapping, internalFields: FieldMappingKey[]): string[] {
-	return internalFields.map((field) => mapping[field]);
+	return internalFields.map((field) => toUserField(mapping, field));
 }
 
 export function validateFieldMapping(mapping: FieldMapping): { valid: boolean; errors: string[] } {
 	const errors: string[] = [];
-	const fields = Object.keys(mapping) as FieldMappingKey[];
+	const resolved = withResolvedMapping(mapping);
+	const fields = Object.keys(resolved) as FieldMappingKey[];
 	for (const field of fields) {
-		if (!mapping[field] || mapping[field].trim() === "") {
+		if (!resolved[field] || resolved[field].trim() === "") {
 			errors.push(`Field "${field}" cannot be empty`);
 		}
 	}
-	const values = Object.values(mapping);
+	const values = Object.values(resolved);
 	if (values.length !== new Set(values).size) {
 		errors.push("Field mappings must have unique property names");
 	}

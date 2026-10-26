@@ -110,6 +110,21 @@ const plan = planCalendarEdit({
   than being projected on each recurrence date. Materialized children suppress
   virtual parent occurrences; supply `materializedOccurrences` for children outside
   the visible task set, keyed by resolved parent task ID.
+- Native scheduled-anchor moves use `recurrence_original_date` as the pending
+  occurrence's identity, while `scheduled` remains its placement. Forward both
+  fields and `recurrence_anchor` in host projection adapters, alongside completion/
+  skip history and Google moved-date fields. IDs, completion/skip lookup, spans and
+  materialized-child suppression use the original identity; a move onto another
+  rule date leaves that real occurrence distinct. Unmarked legacy off-pattern
+  dates are not assigned guessed identities. Completion-anchor tasks ignore this
+  marker. Recorded history remains available when its moved placement is outside
+  the range.
+- `FieldMapping.recurrenceOriginalDate` defaults to `recurrence_original_date`,
+  including for older mappings that omit the key. Mapping accepts only real,
+  strict `YYYY-MM-DD` identities. Calendar moves preserve this identity across
+  repeated moves, remove it on return to its original day, and pin missing DTSTART
+  to the old scheduled date/clock. A series/DTSTART clock edit clears the marker.
+  This is a model extension; it does not change the pinned spec contract version.
 - Edit plans mirror plugin gestures: next-occurrence drops reschedule `scheduled`;
   pattern drops change only DTSTART's clock (preserving its date); recorded drops
   change the scheduled clock without moving its date. No gesture materializes a
@@ -117,6 +132,9 @@ const plan = planCalendarEdit({
   spans are read-only. Resizes change only the estimate, not `scheduled`/`due`,
   except time-entry resizes, which replace their range. `clearedInstances` reports
   completion/skip dates removed by a next-occurrence reschedule, for confirmation.
+- Shared fixtures include `fixtures/calendar/moved-occurrences.json`. Raw JSON
+  edits use `expectedUnsetProperties` to name updates whose value is `undefined`;
+  the typed `calendar/fixtures` export expands these deletions automatically.
 - The index caches eight ranges per task by default. Supply immutable task objects
   or call `upsert` with a changed revision after mutation. `setTasks` preserves
   cached unchanged objects and updates order/membership; `remove` and materialized

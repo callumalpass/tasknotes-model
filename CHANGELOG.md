@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0-rc.18
+
+### Fixed
+
+- TaskNotes #2396: moved native recurring calendar occurrences retain their original rule-date identity for IDs, completion/skip lookup, spans and materialized-child suppression. Their original date is not projected again; moves onto another rule date keep the two occurrences distinct. Recorded history and Google moved-date behavior are preserved.
+- Calendar edit plans capture and preserve the mapped `recurrence_original_date`, delete it on return to the original day or a series/DTSTART edit, and anchor DTSTART-less rules to the old scheduled date and clock rather than the moved placement. Legacy unmarked off-pattern and completion-anchored tasks do not acquire guessed identities.
+
+### Added
+
+- Optional `recurrenceOriginalDate` field mapping (default `recurrence_original_date`), task/schema support and strict date normalization, with fallback for older saved mappings.
+- Packaged moved-occurrence regression fixtures covering projection, mapped edits, history, materialization and timed/all-day spans.
+
 ## 0.3.0-rc.17
 
 ### Added

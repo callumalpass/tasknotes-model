@@ -56,6 +56,8 @@ export interface TaskInfo {
 	assignees?: string[];
 	recurrence?: string;
 	recurrence_anchor?: RecurrenceAnchor;
+	/** Original rule date of a pending moved native recurring occurrence. */
+	recurrence_original_date?: string;
 	complete_instances?: string[];
 	skipped_instances?: string[];
 	recurrence_parent?: string;
@@ -122,6 +124,8 @@ export interface FieldMapping {
 	dateModified: string;
 	recurrence: string;
 	recurrenceAnchor: string;
+	/** Optional for mappings saved before this field existed. */
+	recurrenceOriginalDate?: string;
 	recurrenceParent: string;
 	occurrenceDate: string;
 	occurrenceMaterialization: string;

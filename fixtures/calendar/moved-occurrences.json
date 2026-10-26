@@ -1,0 +1,766 @@
+[
+	{
+		"name": "native-first-move-captures-rule-identity",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-18",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2"
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z"
+		},
+		"expectedEntries": [
+			{
+				"id": "next-scheduled-a-2026-10-18",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduled",
+				"start": "2026-10-18",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "next-occurrence",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00"
+			}
+		],
+		"edits": [
+			{
+				"entryId": "next-scheduled-a-2026-10-18",
+				"change": {
+					"kind": "drop",
+					"start": "2026-10-12",
+					"allDay": true
+				},
+				"expectedUpdates": {
+					"scheduled": "2026-10-12",
+					"recurrence_original_date": "2026-10-18",
+					"dateModified": "2026-10-12T08:00:00Z"
+				},
+				"expectedFrontmatterPatch": [
+					{
+						"op": "set",
+						"field": "scheduled",
+						"value": "2026-10-12"
+					},
+					{
+						"op": "set",
+						"field": "recurrence_original_date",
+						"value": "2026-10-18"
+					},
+					{
+						"op": "set",
+						"field": "dateModified",
+						"value": "2026-10-12T08:00:00Z"
+					}
+				],
+				"expectedClearedInstances": {
+					"complete": [],
+					"skipped": []
+				}
+			}
+		]
+	},
+	{
+		"name": "native-moved-annual-preserves-and-clears-identity",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-12",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18"
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2027-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z"
+		},
+		"expectedEntries": [
+			{
+				"id": "next-scheduled-a-2026-10-18",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduled",
+				"start": "2026-10-12",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "next-occurrence",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00"
+			},
+			{
+				"id": "recurring-a-2027-10-18",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "recurring",
+				"start": "2027-10-18",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "series-time",
+				"recurringKind": "pattern",
+				"instanceDate": "2027-10-18",
+				"recurringTemplateTime": "09:00"
+			}
+		],
+		"edits": [
+			{
+				"entryId": "next-scheduled-a-2026-10-18",
+				"change": {
+					"kind": "drop",
+					"start": "2027-10-20",
+					"allDay": true
+				},
+				"expectedUpdates": {
+					"scheduled": "2027-10-20",
+					"recurrence_original_date": "2026-10-18",
+					"dateModified": "2026-10-12T08:00:00Z"
+				},
+				"expectedFrontmatterPatch": [
+					{
+						"op": "set",
+						"field": "scheduled",
+						"value": "2027-10-20"
+					},
+					{
+						"op": "set",
+						"field": "recurrence_original_date",
+						"value": "2026-10-18"
+					},
+					{
+						"op": "set",
+						"field": "dateModified",
+						"value": "2026-10-12T08:00:00Z"
+					}
+				],
+				"expectedClearedInstances": {
+					"complete": [],
+					"skipped": []
+				}
+			},
+			{
+				"entryId": "next-scheduled-a-2026-10-18",
+				"change": {
+					"kind": "drop",
+					"start": "2026-10-18",
+					"allDay": true
+				},
+				"expectedUpdates": {
+					"scheduled": "2026-10-18",
+					"dateModified": "2026-10-12T08:00:00Z"
+				},
+				"expectedFrontmatterPatch": [
+					{
+						"op": "set",
+						"field": "scheduled",
+						"value": "2026-10-18"
+					},
+					{
+						"op": "delete",
+						"field": "recurrence_original_date"
+					},
+					{
+						"op": "set",
+						"field": "dateModified",
+						"value": "2026-10-12T08:00:00Z"
+					}
+				],
+				"expectedClearedInstances": {
+					"complete": [],
+					"skipped": []
+				},
+				"expectedUnsetProperties": [
+					"recurrence_original_date"
+				]
+			},
+			{
+				"entryId": "recurring-a-2027-10-18",
+				"change": {
+					"kind": "drop",
+					"start": "2027-10-18T14:30",
+					"allDay": false
+				},
+				"expectedUpdates": {
+					"recurrence": "DTSTART:20261018T143000Z;FREQ=YEARLY;COUNT=2",
+					"dateModified": "2026-10-12T08:00:00Z"
+				},
+				"expectedFrontmatterPatch": [
+					{
+						"op": "set",
+						"field": "recurrence",
+						"value": "DTSTART:20261018T143000Z;FREQ=YEARLY;COUNT=2"
+					},
+					{
+						"op": "delete",
+						"field": "recurrence_original_date"
+					},
+					{
+						"op": "set",
+						"field": "dateModified",
+						"value": "2026-10-12T08:00:00Z"
+					}
+				],
+				"expectedClearedInstances": {
+					"complete": [],
+					"skipped": []
+				},
+				"expectedUnsetProperties": [
+					"recurrence_original_date"
+				]
+			}
+		]
+	},
+	{
+		"name": "native-landing-on-rule-date-keeps-two-identities",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-19",
+					"recurrence": "DTSTART:20261012;FREQ=WEEKLY;COUNT=3",
+					"recurrence_original_date": "2026-10-12",
+					"complete_instances": [
+						"2026-10-12"
+					],
+					"skipped_instances": [
+						"2026-10-19"
+					],
+					"googleCalendarMovedOriginalDates": [
+						"2026-10-26"
+					]
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z"
+		},
+		"expectedEntries": [
+			{
+				"id": "next-scheduled-a-2026-10-12",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduled",
+				"start": "2026-10-19",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": true,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "next-occurrence",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-12",
+				"recurringTemplateTime": "09:00"
+			},
+			{
+				"id": "recurring-a-2026-10-19",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "recurring",
+				"start": "2026-10-19",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": false,
+				"isSkipped": true,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "series-time",
+				"recurringKind": "pattern",
+				"instanceDate": "2026-10-19",
+				"recurringTemplateTime": "09:00"
+			}
+		],
+		"edits": []
+	},
+	{
+		"name": "native-completed-identity-hidden",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-12",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18",
+					"complete_instances": [
+						"2026-10-18"
+					]
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z",
+			"settings": {
+				"showCompletedRecurringInstances": false
+			}
+		},
+		"expectedEntries": [],
+		"edits": []
+	},
+	{
+		"name": "native-skipped-identity-hidden",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-12",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18",
+					"skipped_instances": [
+						"2026-10-18"
+					]
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z",
+			"settings": {
+				"showSkippedRecurringInstances": false
+			}
+		},
+		"expectedEntries": [],
+		"edits": []
+	},
+	{
+		"name": "native-materialized-original-suppresses-moved-parent",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-12",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18"
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z",
+			"materializedOccurrences": {
+				"a": [
+					"2026-10-18"
+				]
+			}
+		},
+		"expectedEntries": [],
+		"edits": []
+	},
+	{
+		"name": "native-moved-all-day-span-uses-placement-offset",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-12",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18",
+					"due": "2026-10-14"
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z",
+			"settings": {
+				"showScheduledToDueSpan": true
+			}
+		},
+		"expectedEntries": [
+			{
+				"id": "span-next-scheduled-a-2026-10-18-2026-10-12",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduledToDueSpan",
+				"start": "2026-10-12",
+				"allDay": true,
+				"durationMinutes": 4320,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": false,
+				"durationEditable": false,
+				"editReason": "recurring-span-readonly",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00",
+				"end": "2026-10-15"
+			}
+		],
+		"edits": []
+	},
+	{
+		"name": "native-moved-timed-span-segment-identities",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-12T09:00",
+					"recurrence": "DTSTART:20261018T100000Z;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18",
+					"due": "2026-10-14T17:00",
+					"timeEstimate": 60
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z",
+			"settings": {
+				"showScheduledToDueSpan": true
+			}
+		},
+		"expectedEntries": [
+			{
+				"id": "span-next-scheduled-a-2026-10-18-2026-10-12",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduledToDueSpan",
+				"start": "2026-10-12T09:00",
+				"allDay": false,
+				"durationMinutes": 60,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": false,
+				"durationEditable": false,
+				"editReason": "recurring-span-readonly",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00",
+				"end": "2026-10-12T10:00"
+			},
+			{
+				"id": "span-next-scheduled-a-2026-10-18-2026-10-13",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduledToDueSpan",
+				"start": "2026-10-13T09:00",
+				"allDay": false,
+				"durationMinutes": 60,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": false,
+				"durationEditable": false,
+				"editReason": "recurring-span-readonly",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00",
+				"end": "2026-10-13T10:00"
+			},
+			{
+				"id": "span-next-scheduled-a-2026-10-18-2026-10-14",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduledToDueSpan",
+				"start": "2026-10-14T09:00",
+				"allDay": false,
+				"durationMinutes": 60,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": false,
+				"durationEditable": false,
+				"editReason": "recurring-span-readonly",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00",
+				"end": "2026-10-14T10:00"
+			}
+		],
+		"edits": []
+	},
+	{
+		"name": "native-recorded-original-visible-when-placement-outside-range",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2027-10-20",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18",
+					"complete_instances": [
+						"2026-10-18"
+					]
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z"
+		},
+		"expectedEntries": [
+			{
+				"id": "recurring-recorded-a-2026-10-18",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "recurring",
+				"start": "2026-10-18",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": true,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "recorded-time",
+				"recurringKind": "recorded",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00"
+			}
+		],
+		"edits": []
+	},
+	{
+		"name": "native-dtstartless-move-pins-old-clock",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-18T09:15",
+					"recurrence": "FREQ=YEARLY;COUNT=2"
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z"
+		},
+		"expectedEntries": [
+			{
+				"id": "next-scheduled-a-2026-10-18",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduled",
+				"start": "2026-10-18T09:15",
+				"allDay": false,
+				"durationMinutes": 60,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "next-occurrence",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:15"
+			}
+		],
+		"edits": [
+			{
+				"entryId": "next-scheduled-a-2026-10-18",
+				"change": {
+					"kind": "drop",
+					"start": "2026-10-12T11:30",
+					"allDay": false
+				},
+				"expectedUpdates": {
+					"scheduled": "2026-10-12T11:30",
+					"recurrence": "DTSTART:20261018T091500Z;FREQ=YEARLY;COUNT=2",
+					"recurrence_original_date": "2026-10-18",
+					"dateModified": "2026-10-12T08:00:00Z"
+				},
+				"expectedFrontmatterPatch": [
+					{
+						"op": "set",
+						"field": "scheduled",
+						"value": "2026-10-12T11:30"
+					},
+					{
+						"op": "set",
+						"field": "recurrence",
+						"value": "DTSTART:20261018T091500Z;FREQ=YEARLY;COUNT=2"
+					},
+					{
+						"op": "set",
+						"field": "recurrence_original_date",
+						"value": "2026-10-18"
+					},
+					{
+						"op": "set",
+						"field": "dateModified",
+						"value": "2026-10-12T08:00:00Z"
+					}
+				],
+				"expectedClearedInstances": {
+					"complete": [],
+					"skipped": []
+				}
+			}
+		]
+	},
+	{
+		"name": "native-legacy-off-pattern-does-not-guess-identity",
+		"input": {
+			"tasks": [
+				{
+					"id": "a",
+					"path": "a.md",
+					"title": "Annual",
+					"status": "open",
+					"priority": "normal",
+					"archived": false,
+					"scheduled": "2026-10-12",
+					"recurrence": "DTSTART:20261018;FREQ=YEARLY;COUNT=2"
+				}
+			],
+			"range": {
+				"start": "2026-10-01",
+				"end": "2026-11-01"
+			},
+			"timezone": "America/New_York",
+			"now": "2026-10-12T08:00:00Z"
+		},
+		"expectedEntries": [
+			{
+				"id": "next-scheduled-a-2026-10-12",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "scheduled",
+				"start": "2026-10-12",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "next-occurrence",
+				"recurringKind": "next-scheduled",
+				"instanceDate": "2026-10-12",
+				"recurringTemplateTime": "09:00"
+			},
+			{
+				"id": "recurring-a-2026-10-18",
+				"taskId": "a",
+				"title": "Annual",
+				"type": "recurring",
+				"start": "2026-10-18",
+				"allDay": true,
+				"durationMinutes": 1440,
+				"isCompleted": false,
+				"isSkipped": false,
+				"startEditable": true,
+				"durationEditable": true,
+				"editReason": "series-time",
+				"recurringKind": "pattern",
+				"instanceDate": "2026-10-18",
+				"recurringTemplateTime": "09:00"
+			}
+		],
+		"edits": [
+			{
+				"entryId": "next-scheduled-a-2026-10-12",
+				"change": {
+					"kind": "drop",
+					"start": "2026-10-13",
+					"allDay": true
+				},
+				"expectedUpdates": {
+					"scheduled": "2026-10-13",
+					"dateModified": "2026-10-12T08:00:00Z"
+				},
+				"expectedFrontmatterPatch": [
+					{
+						"op": "set",
+						"field": "scheduled",
+						"value": "2026-10-13"
+					},
+					{
+						"op": "set",
+						"field": "dateModified",
+						"value": "2026-10-12T08:00:00Z"
+					}
+				],
+				"expectedClearedInstances": {
+					"complete": [],
+					"skipped": []
+				}
+			}
+		]
+	}
+]
