@@ -292,6 +292,33 @@ test("materializes recurring occurrences idempotently", () => {
 	assert.equal(duplicate.existingOccurrence.path, "Tasks/Daily task 2026-06-01.md");
 });
 
+test("materialized occurrences keep the state the parent records for their date", () => {
+	const parent = {
+		title: "Daily task",
+		status: "open",
+		path: "Tasks/Daily task.md",
+		recurrence: "DTSTART:20260601;FREQ=DAILY",
+		scheduled: "2026-06-01",
+		complete_instances: ["2026-06-02"],
+		skipped_instances: ["2026-06-03"],
+	};
+	const plan = (targetDate, statuses = {}) =>
+		buildMaterializeOccurrencePlan({
+			parentTask: parent,
+			targetDate,
+			currentTimestamp: "2026-06-04T08:00:00Z",
+			defaultStatus: "open",
+			...statuses,
+		}).occurrenceTask;
+
+	const completed = plan("2026-06-02", { completedStatus: "done" });
+	assert.equal(completed.status, "done");
+	assert.equal(completed.completedDate, "2026-06-02");
+	assert.equal(plan("2026-06-03", { skippedStatus: "skipped" }).status, "skipped");
+	assert.throws(() => plan("2026-06-03"), /missing_skipped_status/);
+	assert.equal(plan("2026-06-04").status, "open");
+});
+
 test("materialized occurrences inherit planning fields but not parent history", () => {
 	const parent = {
 		title: "Morning review",

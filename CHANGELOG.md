@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0-rc.19
+
+### Added
+
+- `planCalendarOccurrenceChoice` describes both choices for a calendar gesture on a generated recurring occurrence: editing only that occurrence (the occurrence date and the `scheduled`/`due`/`timeEstimate` overrides for its occurrence note, with the due date keeping its offset) or the whole series (`time`, `all-day`, `timed` or `duration`; absent when a series edit would change nothing, such as a move to another day at the same time). `buildInheritedOccurrenceTask` is exported.
+
+### Fixed
+
+- Materializing a recurring occurrence the parent records as completed or skipped creates the note with the completed (and `completedDate`) or skipped status instead of reopening it. `buildMaterializeOccurrencePlan` accepts `completedStatus` and `skippedStatus`, and throws `missing_skipped_status` for a skipped date when no skipped status is available.
+- Moving a scheduled-to-due span shifts both dates by calendar days and wall-clock time, so a daylight-saving change inside the span no longer moves the due time by an hour. Dropping a timed span on a day (all-day row or month cell) stores date-only scheduled and due dates instead of midnight times.
+- Calendar date/timezone conversions reuse one `Intl.DateTimeFormat` per zone and memoize results. Projecting 2,000 tasks into a new week range drops from about 970 ms to 15 ms (TaskNotes calendar view switches with large vaults).
+
 ## 0.3.0-rc.18
 
 ### Fixed

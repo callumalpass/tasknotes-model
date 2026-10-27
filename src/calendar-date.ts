@@ -17,7 +17,28 @@ export function calendarDaysBetween(start: string, end: string): number {
 	);
 }
 
+// Formatter construction dominates conversion cost; conversions are pure, so both are memoized.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+const CACHE_LIMIT = 20_000;
+const toInstant = new Map<string, number>();
+const toCivil = new Map<string, string>();
+
+function remember<T>(cache: Map<string, T>, key: string, value: T): T {
+	if (cache.size >= CACHE_LIMIT) cache.clear();
+	cache.set(key, value);
+	return value;
+}
+
 function formatter(timezone: string): Intl.DateTimeFormat {
+	let format = formatters.get(timezone);
+	if (!format) {
+		format = createFormatter(timezone);
+		formatters.set(timezone, format);
+	}
+	return format;
+}
+
+function createFormatter(timezone: string): Intl.DateTimeFormat {
 	return new Intl.DateTimeFormat("en-CA", {
 		timeZone: timezone,
 		year: "numeric",
@@ -39,6 +60,12 @@ function civilAt(ms: number, format: Intl.DateTimeFormat): string {
  * DST overlaps choose the earlier instant; gaps move forward (Date-compatible).
  */
 export function calendarDateToInstant(value: string, timezone: string): number {
+	const key = `${timezone}\n${value}`;
+	const cached = toInstant.get(key);
+	return cached !== undefined ? cached : remember(toInstant, key, dateToInstant(value, timezone));
+}
+
+function dateToInstant(value: string, timezone: string): number {
 	const match = CIVIL.exec(value);
 	if (!match) {
 		if (!/T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)) throw new Error("invalid-calendar-date");
@@ -67,6 +94,7 @@ export function calendarDateToInstant(value: string, timezone: string): number {
 }
 
 export function calendarInstantToDate(ms: number, timezone: string, allDay = false): string {
-	const civil = civilAt(ms, formatter(timezone));
+	const key = `${timezone}\n${ms}`;
+	const civil = toCivil.get(key) ?? remember(toCivil, key, civilAt(ms, formatter(timezone)));
 	return civil.slice(0, allDay ? 10 : 16);
 }
