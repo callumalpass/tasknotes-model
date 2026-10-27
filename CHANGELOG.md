@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0-rc.20
+
+Implements tasknotes-spec 0.3.0-rc.6 (`tasknotes.task` 0.3.0-rc.6).
+
+### Changed
+
+- App behaviour moved out of the `tasknotes.task` binding into a TaskNotes settings record (`_settings/dev.tasknotes.md`, `tasknotes.settings` 1.0.0, which also implements `mdbase.app-settings` 1.0.0). The rc.6 binding no longer holds `nlp`, `templating`, `time_tracking`, `archive.move_on_archive`/`archive.folder`, `recurrence.reset_body_checkboxes`, `links.write_format`, or the per-status `next_status`, `exclude_from_cycle`, `auto_archive` and `auto_archive_delay_minutes`.
+- `buildTaskNotesMdbaseResources` returns those settings as `appSettings`, writes the contract to `_contracts/tasknotes.task/0.3.0-rc.6.md` (so the rc.5 contract at `_contracts/tasknotes.task.md` can stay for types that still implement it), and generates type version 5. The starter is revision 6; `TASKNOTES_MDBASE_PACK_VERSION` is 0.3.0-rc.19.
+- `patchTaskNotesMdbaseTypeSettings` no longer accepts `recurrence.resetCheckboxesOnRecurrence`, `timeTracking`, `links`, `archive`, `templating` or `statusAutomation`; write them with `buildTaskNotesSettingsPatch`.
+- Types implementing rc.5 or rc.3 are still read. `resolveTaskNotesModelConfigFromMdbaseType(type, fallback, { settings })` reads each moved setting from the record, then the binding, then the fallback. A status without behaviour anywhere is out of the cycle exactly when it is skipped.
+
+### Added
+
+- `@tasknotes/model/settings`: the app-settings logic from mdbase Reader (resolve with defaults and warnings, patch only changed fields, conflicts, read-only on a newer `settings_version` or another app's record, new-record frontmatter, in-place Markdown writes that keep unknown fields, comments and the body) and the TaskNotes definition: `resolveTaskNotesAppSettings` (record, then legacy binding, then fallback), `taskNotesAppSettingsFromLegacyBinding`, `withoutTaskNotesAppSettings`, `absentTaskNotesSettingsPatch` (what a migration adds to a record another device created), `taskNotesAppSettingsFromModelConfig`, `applyTaskNotesAppSettingsToModelConfig`, and `buildTaskNotesSettingsResources` (contract, schema and `tasknotes-settings` type).
+- `upgradeTaskNotesMdbaseTypeContract` lifts an rc.5/rc.3 type to rc.6 and returns the settings it removed. `TASKNOTES_ACCEPTED_CONTRACT_VERSIONS`, `TASKNOTES_LEGACY_CONTRACT_VERSIONS`, `TASKNOTES_LEGACY_CONTRACT_DIGESTS` and `taskNotesContractVersion` are exported.
+
 ## 0.3.0-rc.19
 
 ### Added

@@ -28,7 +28,7 @@ export const TASKNOTES_STARTER_TYPE_VERSION = TASKNOTES_MDBASE_TYPE_VERSION;
  * type's data keeps TASKNOTES_STARTER_TYPE_VERSION, so collections that already
  * have that version do not see a conflicting version change on upgrade.
  */
-export const TASKNOTES_STARTER_REVISION = 5;
+export const TASKNOTES_STARTER_REVISION = 6;
 
 /**
  * The generator bookkeeping published in the first starter. Collections keep

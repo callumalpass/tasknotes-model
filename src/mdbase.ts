@@ -5,6 +5,14 @@ import {
 	TASKNOTES_TASK_COMPLETED_EVENT_SCHEMA,
 	TASKNOTES_TASK_SCHEMA,
 } from "./generated/tasknotes-data-contract";
+import {
+	resolveTaskNotesAppSettings,
+	TASKNOTES_DEFAULT_AUTO_ARCHIVE_DELAY,
+	taskNotesAppSettingsFromLegacyBinding,
+	taskNotesAppSettingsFromModelConfig,
+	withoutTaskNotesAppSettings,
+} from "./settings";
+import type { TaskNotesAppSettingsValues } from "./settings";
 import { TASKNOTES_SPEC_VERSION } from "./types";
 import type {
 	FieldMapping,
@@ -112,6 +120,12 @@ export interface TaskNotesMdbaseResources {
 		records: string;
 	};
 	modelConfig: TaskNotesModelConfig;
+	/**
+	 * The settings-record values these options describe. tasknotes.task rc.6
+	 * keeps them out of the binding; hosts write them to the TaskNotes
+	 * settings record (see ./settings).
+	 */
+	appSettings: TaskNotesAppSettingsValues;
 }
 
 export interface TaskNotesMdbaseTypePack {
@@ -138,19 +152,34 @@ export interface TaskNotesMdbaseTypePack {
  * type's version, so types written by TaskNotes and by the tasknotes.task pack
  * agree and pack upgrades do not see a conflicting version change.
  */
-export const TASKNOTES_MDBASE_TYPE_VERSION = 4;
+export const TASKNOTES_MDBASE_TYPE_VERSION = 5;
 
 /** Version of the generated definition bundle, independent of contract version. */
-export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.17";
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.19";
 export const TASKNOTES_CONTRACT_DIGEST =
-	"sha256:dde71d0d776aa0069ee627fe3c10b1a20f87ba36929a16790598ebfb4e8ebf04";
+	"sha256:c400ead6e218b715d86ad31125bb3d4b2e276817da6ba8065449fd0947b24d67";
+
+/**
+ * Earlier tasknotes.task versions whose types TaskNotes still reads. Their
+ * bindings may hold settings rc.6 moved to the settings record; those are
+ * read as the fallback after the record.
+ */
+export const TASKNOTES_LEGACY_CONTRACT_VERSIONS = ["0.3.0-rc.5", "0.3.0-rc.3"] as const;
+/** Semantic digests of the published legacy contracts, by version. */
+export const TASKNOTES_LEGACY_CONTRACT_DIGESTS: Readonly<Record<string, string>> = {
+	"0.3.0-rc.5": "sha256:dde71d0d776aa0069ee627fe3c10b1a20f87ba36929a16790598ebfb4e8ebf04",
+};
+/** Contract versions a TaskNotes type may implement, newest first. */
+export const TASKNOTES_ACCEPTED_CONTRACT_VERSIONS: readonly string[] = [
+	TASKNOTES_SPEC_VERSION,
+	...TASKNOTES_LEGACY_CONTRACT_VERSIONS,
+];
 
 export interface TaskNotesMdbaseTypeSettingsPatch {
 	defaultStatus?: string;
 	defaultPriority?: string;
 	recurrence?: {
 		maintainDueDateOffset?: boolean;
-		resetCheckboxesOnRecurrence?: boolean;
 	};
 	occurrences?: {
 		defaultMaterialization?: "manual" | "on_completion" | "rolling";
@@ -158,27 +187,6 @@ export interface TaskNotesMdbaseTypeSettingsPatch {
 		pastHorizon?: string;
 		futureHorizon?: string;
 	};
-	timeTracking?: {
-		autoStopOnComplete?: boolean;
-	};
-	links?: {
-		writeFormat?: "wikilink" | "markdown";
-	};
-	archive?: {
-		moveOnArchive?: boolean;
-		folder?: string;
-	};
-	templating?: {
-		enabled?: boolean;
-		templatePath?: string;
-	};
-	statusAutomation?: Record<
-		string,
-		{
-			autoArchive?: boolean;
-			autoArchiveDelay?: number;
-		}
-	>;
 }
 
 type LifecycleEvent = "on_create" | "on_update";
@@ -197,7 +205,10 @@ interface FieldOptions {
  *
  * The patch is deliberately constrained to settings whose schema vocabulary
  * does not change. Custom properties, collection paths, lifecycle rules, and
- * host extensions remain untouched.
+ * host extensions remain untouched. App behaviour (templating, archive moves,
+ * time tracking, checkbox resets, link format, NLP triggers and per-status
+ * automation) lives in the TaskNotes settings record instead: see
+ * buildTaskNotesSettingsPatch in ./settings.
  */
 export function patchTaskNotesMdbaseTypeSettings(
 	type: Record<string, unknown>,
@@ -215,10 +226,6 @@ export function patchTaskNotesMdbaseTypeSettings(
 	const priority = contractSection(binding, "priority");
 	const recurrence = contractSection(binding, "recurrence");
 	const occurrences = contractSection(binding, "occurrences");
-	const timeTracking = contractSection(binding, "time_tracking");
-	const links = contractSection(binding, "links");
-	const archive = contractSection(binding, "archive");
-	const templating = contractSection(binding, "templating");
 	const properties = isRecord(isRecord(result.schema) ? result.schema.value : undefined)
 		? (result.schema as Record<string, any>).value.properties
 		: undefined;
@@ -254,9 +261,6 @@ export function patchTaskNotesMdbaseTypeSettings(
 	if (patch.recurrence?.maintainDueDateOffset !== undefined)
 		recurrence.maintain_due_date_offset =
 			patch.recurrence.maintainDueDateOffset;
-	if (patch.recurrence?.resetCheckboxesOnRecurrence !== undefined)
-		recurrence.reset_body_checkboxes =
-			patch.recurrence.resetCheckboxesOnRecurrence;
 	if (patch.occurrences?.defaultMaterialization !== undefined) {
 		occurrences.default_materialization =
 			patch.occurrences.defaultMaterialization;
@@ -278,59 +282,6 @@ export function patchTaskNotesMdbaseTypeSettings(
 			patch.occurrences.futureHorizon,
 			"future occurrence horizon"
 		);
-	if (patch.timeTracking?.autoStopOnComplete !== undefined)
-		timeTracking.auto_stop_on_complete =
-			patch.timeTracking.autoStopOnComplete;
-	if (patch.links?.writeFormat !== undefined)
-		links.write_format = patch.links.writeFormat;
-	if (patch.archive?.moveOnArchive !== undefined)
-		archive.move_on_archive = patch.archive.moveOnArchive;
-	if (patch.archive?.folder !== undefined)
-		archive.folder = cleanPath(patch.archive.folder, "archive folder");
-	if (patch.templating?.templatePath !== undefined) {
-		const path = patch.templating.templatePath.trim();
-		if (path) templating.template_path = cleanPath(path, "template path");
-		else delete templating.template_path;
-	}
-	if (patch.templating?.enabled !== undefined) {
-		if (
-			patch.templating.enabled &&
-			!stringValue(templating.template_path)
-		)
-			throw new Error(
-				"template path must be set before task templating is enabled."
-			);
-		templating.enabled = patch.templating.enabled;
-	}
-	if (patch.statusAutomation) {
-		const supplied = new Map(Object.entries(patch.statusAutomation));
-		const definitions = definitionMap(status.definitions);
-		for (const value of supplied.keys()) {
-			if (!model.statuses.some((candidate) => candidate.value === value))
-				throw new Error(`Unknown task status "${value}".`);
-		}
-		status.definitions = model.statuses.map((entry) => {
-			const automation = supplied.get(entry.value);
-			const definition = {
-				...(definitions.get(entry.value) ?? statusDefinition(entry)),
-			};
-			if (automation?.autoArchive !== undefined)
-				definition.auto_archive = automation.autoArchive;
-			if (automation?.autoArchiveDelay !== undefined) {
-				if (
-					!Number.isInteger(automation.autoArchiveDelay) ||
-					automation.autoArchiveDelay < 0
-				)
-					throw new Error(
-						`Auto-archive delay for "${entry.value}" must be a non-negative integer.`
-					);
-				definition.auto_archive_delay_minutes =
-					automation.autoArchiveDelay;
-			}
-			return definition;
-		});
-	}
-
 	return result;
 }
 
@@ -637,11 +588,11 @@ export function buildTaskNotesMdbaseResources(
 		throw new Error("A custom TaskNotes filename format requires a template.");
 	}
 	const defaultSkipped = skippedValues[0];
-	const templatePath = options.templating?.templatePath?.trim();
-	const occurrenceTemplatePath = options.templating?.occurrenceTemplatePath?.trim();
-	const templateEnabled = options.templating?.enabled === true && Boolean(templatePath);
-	const occurrenceTemplateEnabled =
-		options.templating?.occurrenceEnabled === true && Boolean(occurrenceTemplatePath);
+	const appSettings = taskNotesAppSettingsFromModelConfig(modelConfig, {
+		templating: options.templating,
+		archive: options.archive,
+		links: options.links,
+	});
 	const binding: Record<string, unknown> = {
 		profiles,
 		capabilities,
@@ -668,7 +619,6 @@ export function buildTaskNotesMdbaseResources(
 		recurrence: {
 			syntax: "tasknotes",
 			maintain_due_date_offset: modelConfig.recurrence.maintainDueDateOffset,
-			reset_body_checkboxes: modelConfig.recurrence.resetCheckboxesOnRecurrence,
 		},
 		occurrences: {
 			identity_roles: ["recurrenceParent", "occurrenceDate"],
@@ -683,34 +633,9 @@ export function buildTaskNotesMdbaseResources(
 		},
 		links: {
 			accepted_formats: ["wikilink", "markdown"],
-			write_format: options.links?.writeFormat ?? "wikilink",
 		},
 		archive: {
 			archived_tag: mapping.archiveTag,
-			move_on_archive: options.archive?.moveOnArchive === true,
-			...(options.archive?.folder?.trim() ? { folder: options.archive.folder.trim() } : {}),
-		},
-		time_tracking: {
-			auto_stop_on_complete: modelConfig.timeTracking.autoStopOnComplete,
-		},
-		...(modelConfig.nlp
-			? {
-					nlp: {
-						triggers: modelConfig.nlp.triggers.map((trigger) => ({
-							property_id: trigger.propertyId,
-							trigger: trigger.trigger,
-							enabled: trigger.enabled,
-						})),
-					},
-				}
-			: {}),
-		templating: {
-			enabled: templateEnabled,
-			...(templatePath ? { template_path: templatePath } : {}),
-			occurrence_enabled: occurrenceTemplateEnabled,
-			...(occurrenceTemplatePath
-				? { occurrence_template_path: occurrenceTemplatePath }
-				: {}),
 		},
 	};
 	const generator: Record<string, unknown> = {
@@ -824,20 +749,25 @@ export function buildTaskNotesMdbaseResources(
 			"TaskNotes task view and supplies TaskNotes behavior.",
 			"",
 			"Changes made here are loaded by TaskNotes. Portable changes made in TaskNotes",
-			"settings are written back while unknown extensions are preserved.",
+			"settings are written back while unknown extensions are preserved. App",
+			"behaviour, such as templates and archive moves, is kept in the TaskNotes",
+			"settings record instead.",
 			"",
 		].join("\n"),
 		taskSchemaDocument,
 		bindingSchemaDocument,
 		paths: {
 			config: "mdbase.yaml",
-			contract: `${contractsFolder}/tasknotes.task.md`,
+			// Versioned, so the rc.5 contract at tasknotes.task.md stays for
+			// types that still implement it.
+			contract: `${contractsFolder}/tasknotes.task/${TASKNOTES_SPEC_VERSION}.md`,
 			type: `${typesFolder}/${typeName}.md`,
 			taskSchema: `${schemasFolder}/tasknotes-task.schema.json`,
 			bindingSchema: `${schemasFolder}/tasknotes-task-binding.schema.json`,
 			records: tasksFolder,
 		},
 		modelConfig,
+		appSettings,
 	};
 }
 
@@ -856,7 +786,7 @@ export async function buildTaskNotesMdbaseTypePack(
 		{
 			kind: "contract" as const,
 			mode: "managed" as const,
-			source: "contracts/tasknotes.task.md",
+			source: `contracts/tasknotes.task/${TASKNOTES_SPEC_VERSION}.md`,
 			target: resources.paths.contract,
 			document: resources.contractDocument,
 		},
@@ -928,12 +858,19 @@ export async function buildTaskNotesMdbaseTypePack(
 /** Resolve the TaskNotes configuration advertised by an mdbase task type. */
 export function resolveTaskNotesModelConfigFromMdbaseType(
 	value: unknown,
-	fallback: Partial<TaskNotesModelConfig> = {}
+	fallback: Partial<TaskNotesModelConfig> = {},
+	options: {
+		/**
+		 * Frontmatter of the TaskNotes settings record, when there is one. Its
+		 * fields win over an earlier binding's, which win over `fallback`.
+		 */
+		settings?: Readonly<Record<string, unknown>>;
+	} = {}
 ): TaskNotesModelConfig {
 	const base = resolveModelConfig(fallback);
-	if (!isRecord(value)) return base;
+	if (!isRecord(value)) return applyStoredAppSettings(base, options.settings);
 	const implementation = taskNotesImplementation(value);
-	if (!implementation) return base;
+	if (!implementation) return applyStoredAppSettings(base, options.settings);
 	const extension = isRecord(implementation.binding)
 		? implementation.binding
 		: {};
@@ -978,7 +915,7 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	const defaultStatus = stringValue(status.default) ?? base.defaults.status;
 	const defaultPriority = stringValue(priority.default) ?? base.defaults.priority;
 
-	return resolveModelConfig({
+	return applyStoredAppSettings(resolveModelConfig({
 		...base,
 		fieldMapping,
 		statuses,
@@ -1032,7 +969,84 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 				base.timeTracking.autoStopOnComplete,
 		},
 		nlp: resolveNlpConfig(nlp, base.nlp),
+	}), options.settings);
+}
+
+/** A configuration with the settings record's stored fields applied over it. */
+function applyStoredAppSettings(
+	config: TaskNotesModelConfig,
+	settings: Readonly<Record<string, unknown>> | undefined
+): TaskNotesModelConfig {
+	if (!settings) return config;
+	const stored = resolveTaskNotesAppSettings(settings).stored;
+	const statuses = config.statuses.map((status) => {
+		const behavior = stored.status_behavior?.[status.value];
+		if (!behavior) return status;
+		const next: StatusConfig = { ...status };
+		if (behavior.exclude_from_cycle !== undefined) next.excludeFromCycle = behavior.exclude_from_cycle;
+		if (behavior.auto_archive !== undefined) next.autoArchive = behavior.auto_archive;
+		if (behavior.auto_archive_delay_minutes !== undefined)
+			next.autoArchiveDelay = behavior.auto_archive_delay_minutes;
+		if (behavior.next_status !== undefined) next.nextStatus = behavior.next_status;
+		return next;
 	});
+	return resolveModelConfig({
+		...config,
+		statuses,
+		recurrence: {
+			...config.recurrence,
+			...(stored.reset_body_checkboxes_on_recurrence !== undefined
+				? { resetCheckboxesOnRecurrence: stored.reset_body_checkboxes_on_recurrence }
+				: {}),
+		},
+		timeTracking: {
+			...config.timeTracking,
+			...(stored.auto_stop_time_tracking_on_complete !== undefined
+				? { autoStopOnComplete: stored.auto_stop_time_tracking_on_complete }
+				: {}),
+		},
+		...(stored.nlp_triggers
+			? {
+					nlp: {
+						triggers: stored.nlp_triggers.map((trigger) => ({
+							propertyId: trigger.property_id,
+							trigger: trigger.trigger,
+							enabled: trigger.enabled,
+						})),
+					},
+				}
+			: {}),
+	});
+}
+
+/**
+ * The TaskNotes implementation of a type upgraded to the current contract:
+ * the version raised and every setting rc.6 moved to the settings record
+ * removed from the binding. `appSettings` holds those settings, for the
+ * host to write to the record in the same step. Other content is preserved.
+ */
+export function upgradeTaskNotesMdbaseTypeContract(type: Record<string, unknown>): {
+	type: Record<string, unknown>;
+	appSettings: Partial<TaskNotesAppSettingsValues>;
+	upgraded: boolean;
+} {
+	const result = cloneValue(type) as Record<string, unknown>;
+	const implementation = taskNotesImplementation(result);
+	if (!implementation) throw new Error("The mdbase type is not a TaskNotes task contract.");
+	const appSettings = taskNotesAppSettingsFromLegacyBinding(implementation.binding);
+	const upgraded = implementation.version !== TASKNOTES_SPEC_VERSION;
+	implementation.version = TASKNOTES_SPEC_VERSION;
+	if (isRecord(implementation.binding)) {
+		implementation.binding = withoutTaskNotesAppSettings(implementation.binding);
+	}
+	return { type: result, appSettings, upgraded };
+}
+
+/** The contract version a TaskNotes type implements, if it is one TaskNotes reads. */
+export function taskNotesContractVersion(type: unknown): string | undefined {
+	if (!isRecord(type)) return undefined;
+	const version = taskNotesImplementation(type)?.version;
+	return typeof version === "string" ? version : undefined;
 }
 
 function resolveTaskIdentification(
@@ -1447,11 +1461,7 @@ function statusDefinition(status: StatusConfig): Record<string, unknown> {
 		...(status.icon?.trim() ? { icon: status.icon.trim() } : {}),
 		is_completed: status.isCompleted,
 		is_skipped: status.isSkipped === true,
-		exclude_from_cycle: status.excludeFromCycle === true,
-		...(status.nextStatus?.trim() ? { next_status: status.nextStatus.trim() } : {}),
 		order: status.order,
-		auto_archive: status.autoArchive,
-		auto_archive_delay_minutes: status.autoArchiveDelay,
 	};
 }
 
@@ -1488,10 +1498,11 @@ function resolveStatuses(
 					isCompleted:
 						booleanValue(definition?.is_completed) ?? completed.has(value),
 					isSkipped: booleanValue(definition?.is_skipped) ?? skipped.has(value),
+					// rc.5 and earlier bindings; rc.6 keeps these in the settings record.
 					excludeFromCycle:
 						booleanValue(definition?.exclude_from_cycle) ??
 						existing?.excludeFromCycle ??
-						false,
+						(booleanValue(definition?.is_skipped) ?? skipped.has(value)),
 					...(stringValue(definition?.next_status) ?? existing?.nextStatus
 						? {
 								nextStatus:
@@ -1504,7 +1515,7 @@ function resolveStatuses(
 					autoArchiveDelay:
 						numberValue(definition?.auto_archive_delay_minutes) ??
 						existing?.autoArchiveDelay ??
-						5,
+						TASKNOTES_DEFAULT_AUTO_ARCHIVE_DELAY,
 				};
 			})
 		: fallback.map((status) => ({ ...status }));
@@ -1558,12 +1569,18 @@ function taskNotesImplementation(
 	type: Record<string, unknown>
 ): Record<string, any> | undefined {
 	if (!Array.isArray(type.implements)) return undefined;
-	return type.implements.find(
+	const candidates = type.implements.filter(
 		(candidate): candidate is Record<string, any> =>
 			isRecord(candidate) &&
 			candidate.contract === "tasknotes.task" &&
-			candidate.version === TASKNOTES_SPEC_VERSION
+			TASKNOTES_ACCEPTED_CONTRACT_VERSIONS.includes(String(candidate.version))
 	);
+	// Prefer the newest contract a type implements.
+	for (const version of TASKNOTES_ACCEPTED_CONTRACT_VERSIONS) {
+		const match = candidates.find((candidate) => candidate.version === version);
+		if (match) return match;
+	}
+	return undefined;
 }
 
 function requiredConfiguredValue(
