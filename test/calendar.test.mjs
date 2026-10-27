@@ -220,3 +220,40 @@ test("edit guards prevent unsupported gestures and custom field patches remain s
 		{ op: "set", field: "modified", value: input.now },
 	]);
 });
+
+test("pattern gestures offer this occurrence as a moved note or the series clock", async () => {
+	const { planCalendarOccurrenceChoice } = await import("../dist/esm/calendar.js");
+	const task = {
+		id: "t",
+		path: "t.md",
+		title: "Weekly",
+		status: "open",
+		scheduled: "2026-03-02T09:00",
+		due: "2026-03-03",
+		recurrence: "DTSTART:20260302T090000Z;FREQ=WEEKLY",
+	};
+	const input = {
+		tasks: [task],
+		range: { start: "2026-03-01", end: "2026-03-22" },
+		timezone: "UTC",
+		now: "2026-03-01T00:00:00Z",
+	};
+	const entries = buildCalendarEntries(input);
+	const pattern = entries.find((e) => e.recurringKind === "pattern" && e.instanceDate === "2026-03-09");
+	const plan = (change, entry = pattern) =>
+		planCalendarOccurrenceChoice({ task, entry, change, timezone: "UTC" });
+
+	// Another day, same clock: only this occurrence can move; the due date keeps its offset.
+	assert.deepEqual(plan({ kind: "drop", start: "2026-03-11T09:00", allDay: false }), {
+		occurrence: { occurrenceDate: "2026-03-09", overrides: { scheduled: "2026-03-11T09:00", due: "2026-03-12" } },
+		series: undefined,
+	});
+	assert.equal(plan({ kind: "drop", start: "2026-03-09T14:00", allDay: false }).series, "time");
+	assert.equal(plan({ kind: "drop-on-day", start: "2026-03-10", allDay: true }).series, "all-day");
+	assert.deepEqual(
+		plan({ kind: "resize", start: "2026-03-09T09:00", end: "2026-03-09T10:30", allDay: false }),
+		{ occurrence: { occurrenceDate: "2026-03-09", overrides: { timeEstimate: 90 } }, series: "duration" },
+	);
+	const next = entries.find((e) => e.recurringKind === "next-scheduled");
+	assert.equal(plan({ kind: "drop", start: "2026-03-03T09:00", allDay: false }, next), undefined);
+});

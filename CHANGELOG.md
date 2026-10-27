@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `planCalendarOccurrenceChoice` describes both choices for a calendar gesture on a generated recurring occurrence: editing only that occurrence (the occurrence date and the `scheduled`/`due`/`timeEstimate` overrides for its occurrence note, with the due date keeping its offset) or the whole series (`time`, `all-day`, `timed` or `duration`; absent when a series edit would change nothing, such as a move to another day at the same time). `buildInheritedOccurrenceTask` is exported.
+
 ### Fixed
 
 - Materializing a recurring occurrence the parent records as completed or skipped creates the note with the completed (and `completedDate`) or skipped status instead of reopening it. `buildMaterializeOccurrencePlan` accepts `completedStatus` and `skippedStatus`, and throws `missing_skipped_status` for a skipped date when no skipped status is available.

@@ -1390,7 +1390,8 @@ function assertMaterializedOccurrence(task: TaskInfo, targetDate: string): void 
 	}
 }
 
-function buildInheritedOccurrenceTask(parentTask: TaskInfo, targetDate: string): Partial<TaskInfo> {
+/** Fields an occurrence note for `targetDate` inherits from its recurring parent. */
+export function buildInheritedOccurrenceTask(parentTask: TaskInfo, targetDate: string): Partial<TaskInfo> {
 	const scheduled = parentTask.scheduled
 		? rebaseDateLikeToOccurrence(parentTask.scheduled, parentTask.scheduled, targetDate)
 		: targetDate;

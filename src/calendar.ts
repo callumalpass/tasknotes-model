@@ -1,6 +1,10 @@
 import { addDTSTARTToRecurrenceRule, generateRecurringInstances } from "./recurrence.js";
 import { normalizeRecurrenceOriginalDate } from "./mapping.js";
-import { normalizeTaskReference, taskInfoUpdatesToFrontmatterPatch } from "./operations.js";
+import {
+	buildInheritedOccurrenceTask,
+	normalizeTaskReference,
+	taskInfoUpdatesToFrontmatterPatch,
+} from "./operations.js";
 import type { FieldMapping, TaskInfo, TaskOperationPlan, TaskUpdateInput } from "./types.js";
 import {
 	addCalendarDays,
@@ -694,6 +698,75 @@ export function planCalendarEdit({
 		clearedInstances,
 		preserveRecurrenceSchedule: true,
 	};
+}
+
+/**
+ * What a series-wide calendar edit of a pattern occurrence changes: its clock
+ * ("time"), all occurrences to all-day ("all-day") or to timed ("timed"), or
+ * their duration ("duration"). A pattern drop never moves the series' days.
+ */
+export type CalendarSeriesEffect = "time" | "all-day" | "timed" | "duration";
+export interface CalendarOccurrenceChoice {
+	/** Edit only this occurrence: materialize its note with these overrides. */
+	occurrence: {
+		occurrenceDate: string;
+		overrides: Pick<Partial<TaskInfo>, "scheduled" | "due" | "timeEstimate">;
+	};
+	/** Edit every occurrence through planCalendarEdit; absent when that would change nothing. */
+	series?: CalendarSeriesEffect;
+}
+export interface PlanCalendarOccurrenceChoiceInput {
+	task: TaskInfo;
+	entry: CalendarEntry;
+	change: CalendarChange;
+	timezone: string;
+}
+
+/**
+ * For a gesture on a generated (pattern) occurrence, describes both choices a
+ * host should offer: this occurrence only, or the whole series. Returns
+ * undefined for any other entry, which planCalendarEdit handles directly.
+ */
+export function planCalendarOccurrenceChoice({
+	task,
+	entry,
+	change,
+	timezone,
+}: PlanCalendarOccurrenceChoiceInput): CalendarOccurrenceChoice | undefined {
+	if (entry.recurringKind !== "pattern" || entry.isMaterializedOccurrence) return undefined;
+	if (entry.taskId !== calendarTaskId(task)) throw new Error("calendar-task-mismatch");
+	const occurrenceDate = entry.instanceDate || calendarDay(entry.start);
+	const start = calendarDateToInstant(change.start, timezone);
+	if (change.kind === "resize") {
+		if (!change.end) throw new Error("missing-calendar-range");
+		const end = calendarDateToInstant(change.end, timezone);
+		const timeEstimate = change.allDay
+			? Math.round((end - start) / 86_400_000) * 1440
+			: Math.round((end - start) / 60000);
+		return {
+			occurrence: { occurrenceDate, overrides: { timeEstimate } },
+			series: "duration",
+		};
+	}
+	const toDay = change.allDay || change.kind === "drop-on-day";
+	const scheduled = calendarInstantToDate(start, timezone, toDay);
+	const overrides: CalendarOccurrenceChoice["occurrence"]["overrides"] = { scheduled };
+	// The due date keeps its offset from the occurrence's day.
+	const inheritedDue = buildInheritedOccurrenceTask(task, occurrenceDate).due;
+	if (inheritedDue) {
+		const days = calendarDaysBetween(occurrenceDate, calendarDay(scheduled));
+		overrides.due = `${addCalendarDays(calendarDay(inheritedDue), days)}${inheritedDue.slice(10)}`;
+	}
+	const from = calendarInstantToDate(calendarDateToInstant(entry.start, timezone), timezone, entry.allDay);
+	const series: CalendarSeriesEffect | undefined =
+		toDay && !entry.allDay
+			? "all-day"
+			: !toDay && entry.allDay
+				? "timed"
+				: !toDay && from.slice(11, 16) !== scheduled.slice(11, 16)
+					? "time"
+					: undefined;
+	return { occurrence: { occurrenceDate, overrides }, series };
 }
 
 export interface CalendarEntryIndex {
