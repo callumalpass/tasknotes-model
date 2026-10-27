@@ -6,27 +6,28 @@ import {
 	TASKNOTES_STARTER_TYPE_VERSION,
 } from "../dist/esm/starter.js";
 
-// The published tasknotes.task 0.3.0-rc.17 pack
-// (https://mdbase.dev/contracts/packs/tasknotes.task/0.3.0-rc.17.json). If the
-// starter changes, publish a new starter type version in mdbase-contracts and
+// The tasknotes.task 0.3.0-rc.19 pack in mdbase-contracts
+// (packs/tasknotes.task/0.3.0-rc.19.pack.yaml, published at
+// https://mdbase.dev/contracts/packs/tasknotes.task/0.3.0-rc.19.json). If the
+// starter changes, publish a new starter revision in mdbase-contracts and
 // update these digests together; collections upgrade by merging against the
 // previous starter, so an unintended change here reaches every collection.
-const PUBLISHED_RC17_RESOURCES = {
-	"_contracts/tasknotes.task.md":
-		"sha256:ecadd00700e249940f4244aaa5b5985a96557d13340463ec491dfa5e89b032a4",
+const PUBLISHED_RC19_RESOURCES = {
+	"_contracts/tasknotes.task/0.3.0-rc.6.md":
+		"sha256:3f4eb90782948ed68112ffcc99575911036020544cf501de3d2265b588b38456",
 	"_types/task.md":
-		"sha256:b3cf8dbe8885b331c494d2eeb36abfb052890e06b757877d655c269e666487dc",
+		"sha256:87e52c25b474a06283b29e2983ae4fc6e618fd1a4cbcc5856ff9a67328df605b",
 	"_schemas/tasknotes/tasknotes-task.schema.json":
-		"sha256:aec95578a093be95cbce0fb500964e7aeaeeacc611624fc2893074637dbd4125",
+		"sha256:ac78a55f46669d6e8bd08d608b7c25338fec8ba7606dbf54ebd6b8d4e66b7035",
 	"_schemas/tasknotes/tasknotes-task-binding.schema.json":
-		"sha256:5b38e8a1c426b7f7fa92d8353fe35dd98e632305cbb15ffccde387473166b267",
+		"sha256:4f8f3288f593ce06a04525697308173147ff957e7066f83d9a922468d06be659",
 };
 
 test("the starter reproduces the published TaskNotes pack byte for byte", async () => {
 	const pack = await buildTaskNotesMdbaseTypePack(buildTaskNotesStarterResources());
 	assert.deepEqual(
 		Object.fromEntries(pack.manifest.resources.map((resource) => [resource.target, resource.digest])),
-		PUBLISHED_RC17_RESOURCES,
+		PUBLISHED_RC19_RESOURCES,
 	);
 });
 

@@ -17,6 +17,7 @@ const entries = [
 	"frontmatter",
 	"mdbase",
 	"starter",
+	"settings",
 	"conformance",
 	"calendar",
 	"calendar-fixtures",

@@ -5,7 +5,7 @@ export const TASKNOTES_TASK_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task.schema.json",
 	"title": "TaskNotes portable task view",
-	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.5 record contract.",
+	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.6 record contract.",
 	"type": "object",
 	"required": [
 		"status",
@@ -208,7 +208,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task-binding.schema.json",
 	"title": "TaskNotes task data-contract binding",
-	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.3.",
+	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.6. App behaviour, such as templates, archive moves, status cycling and natural-language triggers, lives in the app's tasknotes.settings record instead.",
 	"type": "object",
 	"required": [
 		"profiles",
@@ -219,9 +219,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 		"recurrence",
 		"occurrences",
 		"links",
-		"archive",
-		"time_tracking",
-		"templating"
+		"archive"
 	],
 	"properties": {
 		"profiles": {
@@ -279,15 +277,6 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 		},
 		"archive": {
 			"$ref": "#/$defs/archivePolicy"
-		},
-		"time_tracking": {
-			"$ref": "#/$defs/timeTrackingPolicy"
-		},
-		"templating": {
-			"$ref": "#/$defs/templatingPolicy"
-		},
-		"nlp": {
-			"$ref": "#/$defs/nlpPolicy"
 		}
 	},
 	"additionalProperties": false,
@@ -362,10 +351,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 				"color",
 				"is_completed",
 				"is_skipped",
-				"exclude_from_cycle",
-				"order",
-				"auto_archive",
-				"auto_archive_delay_minutes"
+				"order"
 			],
 			"properties": {
 				"value": {
@@ -386,21 +372,8 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 				"is_skipped": {
 					"type": "boolean"
 				},
-				"exclude_from_cycle": {
-					"type": "boolean"
-				},
-				"next_status": {
-					"$ref": "#/$defs/nonEmptyString"
-				},
 				"order": {
 					"type": "number"
-				},
-				"auto_archive": {
-					"type": "boolean"
-				},
-				"auto_archive_delay_minutes": {
-					"type": "number",
-					"minimum": 0
 				}
 			},
 			"additionalProperties": true
@@ -492,17 +465,13 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 			"type": "object",
 			"required": [
 				"syntax",
-				"maintain_due_date_offset",
-				"reset_body_checkboxes"
+				"maintain_due_date_offset"
 			],
 			"properties": {
 				"syntax": {
 					"const": "tasknotes"
 				},
 				"maintain_due_date_offset": {
-					"type": "boolean"
-				},
-				"reset_body_checkboxes": {
 					"type": "boolean"
 				}
 			},
@@ -547,8 +516,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 		"linkPolicy": {
 			"type": "object",
 			"required": [
-				"accepted_formats",
-				"write_format"
+				"accepted_formats"
 			],
 			"properties": {
 				"accepted_formats": {
@@ -561,12 +529,6 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 							"markdown"
 						]
 					}
-				},
-				"write_format": {
-					"enum": [
-						"wikilink",
-						"markdown"
-					]
 				}
 			},
 			"additionalProperties": false
@@ -574,99 +536,11 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 		"archivePolicy": {
 			"type": "object",
 			"required": [
-				"archived_tag",
-				"move_on_archive"
+				"archived_tag"
 			],
 			"properties": {
 				"archived_tag": {
 					"$ref": "#/$defs/nonEmptyString"
-				},
-				"move_on_archive": {
-					"type": "boolean"
-				},
-				"folder": {
-					"$ref": "#/$defs/nonEmptyString"
-				}
-			},
-			"additionalProperties": false
-		},
-		"timeTrackingPolicy": {
-			"type": "object",
-			"required": [
-				"auto_stop_on_complete"
-			],
-			"properties": {
-				"auto_stop_on_complete": {
-					"type": "boolean"
-				}
-			},
-			"additionalProperties": false
-		},
-		"templatingPolicy": {
-			"type": "object",
-			"required": [
-				"enabled",
-				"occurrence_enabled"
-			],
-			"properties": {
-				"enabled": {
-					"type": "boolean"
-				},
-				"template_path": {
-					"$ref": "#/$defs/nonEmptyString"
-				},
-				"occurrence_enabled": {
-					"type": "boolean"
-				},
-				"occurrence_template_path": {
-					"$ref": "#/$defs/nonEmptyString"
-				},
-				"failure_mode": {
-					"enum": [
-						"error",
-						"warning_fallback"
-					]
-				},
-				"unknown_variable_policy": {
-					"enum": [
-						"preserve",
-						"empty"
-					]
-				}
-			},
-			"additionalProperties": false
-		},
-		"nlpTrigger": {
-			"type": "object",
-			"required": [
-				"property_id",
-				"trigger",
-				"enabled"
-			],
-			"properties": {
-				"property_id": {
-					"$ref": "#/$defs/nonEmptyString"
-				},
-				"trigger": {
-					"$ref": "#/$defs/nonEmptyString"
-				},
-				"enabled": {
-					"type": "boolean"
-				}
-			},
-			"additionalProperties": false
-		},
-		"nlpPolicy": {
-			"type": "object",
-			"required": [
-				"triggers"
-			],
-			"properties": {
-				"triggers": {
-					"type": "array",
-					"items": {
-						"$ref": "#/$defs/nlpTrigger"
-					}
 				}
 			},
 			"additionalProperties": false

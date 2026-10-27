@@ -11,7 +11,7 @@ import {
 function implementation(type) {
 	return type.implements.find(
 		(entry) =>
-			entry.contract === "tasknotes.task" && entry.version === "0.3.0-rc.5"
+			entry.contract === "tasknotes.task" && entry.version === "0.3.0-rc.6"
 	);
 }
 
@@ -30,10 +30,10 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	assert.equal(resources.config.settings.contracts_folder, "_contracts");
 	assert.equal(resources.contract.id, "tasknotes.task");
 	assert.equal(resources.contract.contract_type, "record");
-	assert.equal(resources.contract.version, "0.3.0-rc.5");
+	assert.equal(resources.contract.version, "0.3.0-rc.6");
 	assert.ok(resources.contract.record_schema);
 	assert.equal(taskImplementation.contract, "tasknotes.task");
-	assert.equal(taskImplementation.version, "0.3.0-rc.5");
+	assert.equal(taskImplementation.version, "0.3.0-rc.6");
 	assert.deepEqual(extension.profiles, [
 		"core-lite",
 		"recurrence",
@@ -102,7 +102,7 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	assert.deepEqual(pack.provides, [
 		{
 			id: "tasknotes.task",
-			version: "0.3.0-rc.5",
+			version: "0.3.0-rc.6",
 			digest: pack.provides[0].digest,
 		},
 	]);
@@ -113,7 +113,7 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	assert.deepEqual(
 		pack.manifest.resources.map(({ kind, mode, target }) => [kind, mode, target]),
 		[
-			["contract", "managed", "_contracts/tasknotes.task.md"],
+			["contract", "managed", "_contracts/tasknotes.task/0.3.0-rc.6.md"],
 			["type", "seed", "_types/action.md"],
 			["schema", "managed", "_schemas/tasknotes/tasknotes-task.schema.json"],
 			[
@@ -144,15 +144,17 @@ test("round-trips optional NLP trigger settings through the TaskNotes contract",
 		},
 	});
 
-	assert.deepEqual(binding(resources.type).nlp, {
-		triggers: [
-			{ property_id: "tags", trigger: "#", enabled: true },
-			{ property_id: "priority", trigger: "!", enabled: false },
-			{ property_id: "energy", trigger: "~", enabled: true },
-		],
-	});
+	// rc.6 keeps the triggers in the settings record, not the binding.
+	assert.equal(binding(resources.type).nlp, undefined);
+	assert.deepEqual(resources.appSettings.nlp_triggers, [
+		{ property_id: "tags", trigger: "#", enabled: true },
+		{ property_id: "priority", trigger: "!", enabled: false },
+		{ property_id: "energy", trigger: "~", enabled: true },
+	]);
 	assert.deepEqual(
-		resolveTaskNotesModelConfigFromMdbaseType(resources.type).nlp,
+		resolveTaskNotesModelConfigFromMdbaseType(resources.type, {}, {
+			settings: { app: "dev.tasknotes", scope: "collection", settings_version: 1, nlp_triggers: resources.appSettings.nlp_triggers },
+		}).nlp,
 		{
 			triggers: [
 				{ propertyId: "tags", trigger: "#", enabled: true },
@@ -184,23 +186,12 @@ test("patches portable model settings without replacing custom type content", ()
 		defaultPriority: "high",
 		recurrence: {
 			maintainDueDateOffset: false,
-			resetCheckboxesOnRecurrence: true,
 		},
 		occurrences: {
 			defaultMaterialization: "rolling",
 			defaultNextTrigger: "completion_or_skip",
 			pastHorizon: "p2d",
 			futureHorizon: "P30D",
-		},
-		timeTracking: { autoStopOnComplete: true },
-		links: { writeFormat: "markdown" },
-		archive: { moveOnArchive: true, folder: "Tasks/Archive" },
-		templating: {
-			templatePath: "Templates/Task.md",
-			enabled: true,
-		},
-		statusAutomation: {
-			done: { autoArchive: true, autoArchiveDelay: 15 },
 		},
 	});
 	const extension = binding(patched);
@@ -209,25 +200,11 @@ test("patches portable model settings without replacing custom type content", ()
 	assert.equal(resolved.defaults.status, "in-progress");
 	assert.equal(resolved.defaults.priority, "high");
 	assert.equal(resolved.recurrence.maintainDueDateOffset, false);
-	assert.equal(resolved.recurrence.resetCheckboxesOnRecurrence, true);
 	assert.equal(resolved.occurrences.defaultMaterialization, "rolling");
 	assert.equal(resolved.occurrences.defaultNextTrigger, "completion_or_skip");
 	assert.equal(resolved.occurrences.pastHorizon, "P2D");
 	assert.equal(resolved.occurrences.futureHorizon, "P30D");
-	assert.equal(resolved.timeTracking.autoStopOnComplete, true);
-	assert.equal(extension.links.write_format, "markdown");
-	assert.deepEqual(extension.archive, {
-		archived_tag: "archived",
-		move_on_archive: true,
-		folder: "Tasks/Archive",
-	});
-	assert.equal(extension.templating.enabled, true);
-	assert.equal(extension.templating.template_path, "Templates/Task.md");
-	assert.equal(
-		extension.status.definitions.find(({ value }) => value === "done")
-			.auto_archive_delay_minutes,
-		15
-	);
+	assert.deepEqual(extension.archive, { archived_tag: "archived" });
 	assert.equal(patched.schema.value.properties.status.default, "in-progress");
 	assert.equal(patched.schema.value.properties.priority.default, "high");
 	assert.equal(patched.collection.read_defaults.status, "in-progress");
@@ -252,13 +229,6 @@ test("rejects invalid contract setting patches", () => {
 				defaultStatus: "missing",
 			}),
 		/default status/
-	);
-	assert.throws(
-		() =>
-			patchTaskNotesMdbaseTypeSettings(type, {
-				templating: { enabled: true },
-			}),
-		/template path/
 	);
 	assert.throws(
 		() =>
@@ -460,7 +430,7 @@ test("projects and resolves the complete portable TaskNotes settings snapshot", 
 	assert.equal(resources.type.collection.path.template, "{{priority}}-{{title}}");
 	assert.equal(extension.title.filename_format, "custom");
 	assert.equal(extension.status.default_skipped, "cancelled");
-	assert.equal(extension.status.definitions[1].auto_archive_delay_minutes, 15);
+	assert.equal(extension.status.definitions[1].auto_archive_delay_minutes, undefined);
 	assert.equal(extension.priority.definitions[1].icon, "flame");
 	assert.deepEqual(extension.occurrences, {
 		identity_roles: ["recurrenceParent", "occurrenceDate"],
@@ -469,14 +439,39 @@ test("projects and resolves the complete portable TaskNotes settings snapshot", 
 		past_horizon: "P1D",
 		future_horizon: "P21D",
 	});
-	assert.deepEqual(extension.templating, {
-		enabled: true,
-		template_path: "Templates/Task.md",
-		occurrence_enabled: true,
-		occurrence_template_path: "Templates/Occurrence.md",
-	});
+	assert.equal(extension.templating, undefined);
+	assert.equal(extension.time_tracking, undefined);
+	assert.equal(extension.links.write_format, undefined);
+	assert.deepEqual(
+		{
+			template_enabled: resources.appSettings.template_enabled,
+			template_path: resources.appSettings.template_path,
+			occurrence_template_enabled: resources.appSettings.occurrence_template_enabled,
+			occurrence_template_path: resources.appSettings.occurrence_template_path,
+			move_on_archive: resources.appSettings.move_on_archive,
+			archive_folder: resources.appSettings.archive_folder,
+			link_write_format: resources.appSettings.link_write_format,
+			reset_body_checkboxes_on_recurrence: resources.appSettings.reset_body_checkboxes_on_recurrence,
+			done: resources.appSettings.status_behavior.done,
+			todo: resources.appSettings.status_behavior.todo,
+		},
+		{
+			template_enabled: true,
+			template_path: "Templates/Task.md",
+			occurrence_template_enabled: true,
+			occurrence_template_path: "Templates/Occurrence.md",
+			move_on_archive: true,
+			archive_folder: "Archive/Tasks",
+			link_write_format: "markdown",
+			reset_body_checkboxes_on_recurrence: true,
+			done: { exclude_from_cycle: false, auto_archive: true, auto_archive_delay_minutes: 15 },
+			todo: { next_status: "done", exclude_from_cycle: false, auto_archive: false, auto_archive_delay_minutes: 5 },
+		}
+	);
 	assert.equal(resolved.fieldMapping.title, "summary");
-	assert.equal(resolved.statuses.find(({ value }) => value === "done").autoArchiveDelay, 15);
+	// Without a record, behaviour falls back to the defaults; a skipped status stays out of the cycle.
+	assert.equal(resolved.statuses.find(({ value }) => value === "done").autoArchiveDelay, 5);
+	assert.equal(resolved.statuses.find(({ value }) => value === "cancelled").excludeFromCycle, true);
 	assert.equal(resolved.statuses.find(({ value }) => value === "cancelled").isSkipped, true);
 	assert.equal(resolved.priorities.find(({ value }) => value === "critical").icon, "flame");
 	assert.equal(resolved.taskIdentification.method, "property");
