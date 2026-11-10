@@ -21,6 +21,17 @@ import type {
 	TaskNotesModelConfig,
 	UserMappedField,
 } from "./types";
+import {
+	TASKNOTES_USER_FIELD_KEY,
+	TaskNotesVocabularyError,
+	taskNotesVocabularyProblem,
+} from "./vocabulary";
+import type { TaskNotesVocabularyPatch } from "./vocabulary";
+
+// Each package entry is bundled on its own, so the vocabulary helpers are part
+// of this entry: an error thrown by the editor is then an instance of the class
+// a host imports beside it.
+export * from "./vocabulary";
 
 export const MDBASE_SPEC_VERSION = "0.3.0";
 export const TASKNOTES_TASK_CONTRACT_VERSION = TASKNOTES_SPEC_VERSION;
@@ -175,7 +186,7 @@ export const TASKNOTES_ACCEPTED_CONTRACT_VERSIONS: readonly string[] = [
 	...TASKNOTES_LEGACY_CONTRACT_VERSIONS,
 ];
 
-export interface TaskNotesMdbaseTypeSettingsPatch {
+export interface TaskNotesMdbaseTypeSettingsPatch extends TaskNotesVocabularyPatch {
 	defaultStatus?: string;
 	defaultPriority?: string;
 	recurrence?: {
@@ -203,11 +214,19 @@ interface FieldOptions {
 /**
  * Patch portable TaskNotes model settings in an existing mdbase type.
  *
- * The patch is deliberately constrained to settings whose schema vocabulary
- * does not change. Custom properties, collection paths, lifecycle rules, and
- * host extensions remain untouched. App behaviour (templating, archive moves,
- * time tracking, checkbox resets, link format, NLP triggers and per-status
- * automation) lives in the TaskNotes settings record instead: see
+ * This is the one editor for a TaskNotes task type. Every part of the type
+ * that repeats a setting is rewritten together: the schema's allowed values
+ * and defaults, the completion rule, the collection's read defaults and the
+ * contract binding. Statuses and priorities are given as complete lists; a
+ * default named in the same patch may be one of the new values. Custom
+ * properties the patch does not name, collection paths, lifecycle rules and
+ * host extensions remain untouched. The result is what
+ * buildTaskNotesMdbaseResources generates for the same settings.
+ *
+ * It does not look at the collection's tasks: check taskNotesVocabularyInUse
+ * before removing a status or priority. App behaviour (templating, archive
+ * moves, time tracking, checkbox resets, link format, NLP triggers and
+ * per-status automation) lives in the TaskNotes settings record instead: see
  * buildTaskNotesSettingsPatch in ./settings.
  */
 export function patchTaskNotesMdbaseTypeSettings(
@@ -221,20 +240,24 @@ export function patchTaskNotesMdbaseTypeSettings(
 	}
 	const binding = isRecord(implementation.binding) ? implementation.binding : {};
 	implementation.binding = binding;
-	const model = resolveTaskNotesModelConfigFromMdbaseType(result);
 	const status = contractSection(binding, "status");
 	const priority = contractSection(binding, "priority");
 	const recurrence = contractSection(binding, "recurrence");
 	const occurrences = contractSection(binding, "occurrences");
-	const properties = isRecord(isRecord(result.schema) ? result.schema.value : undefined)
-		? (result.schema as Record<string, any>).value.properties
-		: undefined;
 	const collection = isRecord(result.collection) ? result.collection : {};
 	const readDefaults = isRecord(collection.read_defaults)
 		? collection.read_defaults
 		: {};
 	collection.read_defaults = readDefaults;
 	result.collection = collection;
+
+	if (patch.statuses || patch.priorities || patch.userFields) {
+		applyVocabularyPatch(result, patch, { status, priority, readDefaults });
+	}
+	const model = resolveTaskNotesModelConfigFromMdbaseType(result);
+	const properties = isRecord(isRecord(result.schema) ? result.schema.value : undefined)
+		? (result.schema as Record<string, any>).value.properties
+		: undefined;
 
 	if (patch.defaultStatus !== undefined) {
 		const value = requiredConfiguredValue(
@@ -283,6 +306,201 @@ export function patchTaskNotesMdbaseTypeSettings(
 			"future occurrence horizon"
 		);
 	return result;
+}
+
+/**
+ * Rewrite the parts of a type that name its statuses, priorities and custom
+ * fields. `sections` are the already-resolved parts of `type` to write into.
+ */
+function applyVocabularyPatch(
+	type: Record<string, unknown>,
+	patch: TaskNotesMdbaseTypeSettingsPatch,
+	sections: {
+		status: Record<string, unknown>;
+		priority: Record<string, unknown>;
+		readDefaults: Record<string, unknown>;
+	}
+): void {
+	const model = resolveTaskNotesModelConfigFromMdbaseType(type);
+	const { status, priority, readDefaults } = sections;
+	const schemaHolder = contractSection(type, "schema");
+	const schema = contractSection(schemaHolder, "value");
+	const properties = contractSection(schema, "properties");
+	const generator = isRecord(type["x-tasknotes-generator"])
+		? type["x-tasknotes-generator"]
+		: undefined;
+	const defaults = {
+		status: patch.defaultStatus?.trim() ?? model.defaults.status,
+		priority: patch.defaultPriority?.trim() ?? model.defaults.priority,
+	};
+
+	const problem = taskNotesVocabularyProblem(patch, defaults);
+	if (problem) throw new TaskNotesVocabularyError(problem);
+
+	if (patch.statuses) {
+		const field = model.fieldMapping.status;
+		const existing = definitionMap(status.definitions);
+		const values = patch.statuses.map(({ value }) => value);
+		const completed = patch.statuses
+			.filter((entry) => entry.isCompleted)
+			.map(({ value }) => value);
+		const wasSkipped = new Set(stringArray(status.skipped_values));
+		const skipped = patch.statuses
+			.filter(
+				(entry) =>
+					!entry.isCompleted && (entry.isSkipped ?? wasSkipped.has(entry.value))
+			)
+			.map(({ value }) => value);
+		status.values = values;
+		status.default = defaults.status;
+		status.completed_values = completed;
+		status.skipped_values = skipped;
+		if (skipped[0] === undefined) delete status.default_skipped;
+		else if (
+			typeof status.default_skipped !== "string" ||
+			!skipped.includes(status.default_skipped)
+		)
+			status.default_skipped = skipped[0];
+		status.definitions = patch.statuses.map((entry, index) => {
+			const previous = { ...(existing.get(entry.value) ?? {}) };
+			const icon = entry.icon === undefined ? stringValue(previous.icon) : entry.icon.trim();
+			for (const key of ["icon", "isCompleted", "isSkipped", "is_completed", "is_skipped", "order"])
+				delete previous[key];
+			return {
+				value: entry.value,
+				label: entry.label.trim(),
+				color: entry.color.trim() || FALLBACK_VOCABULARY_COLOR,
+				...(icon ? { icon } : {}),
+				is_completed: entry.isCompleted,
+				is_skipped: skipped.includes(entry.value),
+				order: entry.order ?? index,
+				...withoutKeys(previous, ["value", "label", "color"]),
+			};
+		});
+		setSchemaEnum(properties[field], values, defaults.status);
+		readDefaults[field] = defaults.status;
+		// The type requires a completion date for exactly the completed statuses.
+		if (Array.isArray(schema.allOf)) {
+			for (const rule of schema.allOf) {
+				const condition =
+					isRecord(rule) && isRecord(rule.if) && isRecord(rule.if.properties)
+						? rule.if.properties[field]
+						: undefined;
+				if (isRecord(condition) && Array.isArray(condition.enum))
+					condition.enum = [...completed];
+			}
+		}
+	}
+
+	if (patch.priorities) {
+		const field = model.fieldMapping.priority;
+		const existing = definitionMap(priority.definitions);
+		const values = patch.priorities.map(({ value }) => value);
+		priority.values = values;
+		priority.default = defaults.priority;
+		priority.definitions = patch.priorities.map((entry, index) => {
+			const previous = { ...(existing.get(entry.value) ?? {}) };
+			const icon = entry.icon === undefined ? stringValue(previous.icon) : entry.icon.trim();
+			return {
+				value: entry.value,
+				label: entry.label.trim(),
+				color: entry.color.trim() || FALLBACK_VOCABULARY_COLOR,
+				...(icon ? { icon } : {}),
+				weight: entry.weight ?? index,
+				...withoutKeys(previous, ["value", "label", "color", "icon", "weight"]),
+			};
+		});
+		setSchemaEnum(properties[field], values, defaults.priority);
+		readDefaults[field] = defaults.priority;
+	}
+
+	const fields = patch.userFields;
+	if (!fields) return;
+	const reserved = new Set(
+		[
+			...Object.keys(model.fieldMapping),
+			...Object.values(model.fieldMapping),
+			"id",
+			"tags",
+			"type",
+			"types",
+		].map((key) => key.toLocaleLowerCase())
+	);
+	const legacyCompatibility =
+		generator?.legacy_compatibility === true || isRecord(type["x-legacy-v0.2"]);
+	const managed =
+		generator && Array.isArray(generator.managed_fields)
+			? new Set(stringArray(generator.managed_fields))
+			: undefined;
+	for (const key of fields.remove ?? []) {
+		if (reserved.has(key.toLocaleLowerCase())) continue;
+		delete properties[key];
+		delete readDefaults[key];
+		managed?.delete(key);
+		if (Array.isArray(schema.required))
+			schema.required = schema.required.filter((name: unknown) => name !== key);
+	}
+	for (const { key, displayName } of fields.rename ?? []) {
+		const property = properties[key];
+		if (!isRecord(property)) continue;
+		if (!displayName.trim())
+			throw new TaskNotesVocabularyError({ kind: "field-label", key });
+		properties[key] = { title: displayName.trim(), ...withoutKeys(property, ["title"]) };
+	}
+	for (const field of fields.add ?? []) {
+		const key = field.key.trim();
+		if (!TASKNOTES_USER_FIELD_KEY.test(key))
+			throw new TaskNotesVocabularyError({ kind: "field-name", key });
+		if (
+			reserved.has(key.toLocaleLowerCase()) ||
+			Object.keys(properties).some(
+				(name) => name.toLocaleLowerCase() === key.toLocaleLowerCase()
+			)
+		)
+			throw new TaskNotesVocabularyError({ kind: "field-taken", key });
+		if (!field.displayName.trim())
+			throw new TaskNotesVocabularyError({ kind: "field-label", key });
+		properties[key] = userFieldProperty(
+			{ id: key, key, displayName: field.displayName, type: field.type },
+			legacyCompatibility
+		);
+		managed?.add(key);
+	}
+	if (generator && managed) generator.managed_fields = [...managed].sort();
+}
+
+const FALLBACK_VOCABULARY_COLOR = "#808080";
+
+/** Narrow or widen an enum property, wherever a nullable wrapper keeps it. */
+function setSchemaEnum(property: unknown, values: string[], fallback: string): void {
+	if (!isRecord(property)) return;
+	const holder = Array.isArray(property.enum)
+		? property
+		: Array.isArray(property.anyOf)
+			? property.anyOf.find((branch) => isRecord(branch) && Array.isArray(branch.enum))
+			: undefined;
+	if (!isRecord(holder)) return;
+	holder.enum = [...values];
+	if ("default" in holder) holder.default = fallback;
+}
+
+function withoutKeys(
+	value: Record<string, unknown>,
+	keys: readonly string[]
+): Record<string, unknown> {
+	return Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
+}
+
+/** A custom field's schema property, titled with the name people see. */
+function userFieldProperty(
+	field: UserMappedField,
+	legacyCompatibility: boolean
+): Record<string, unknown> {
+	const title = field.displayName?.trim();
+	return {
+		...(title ? { title } : {}),
+		...userFieldSchema(field, legacyCompatibility),
+	};
 }
 
 /**
@@ -553,7 +771,7 @@ export function buildTaskNotesMdbaseResources(
 	addField("sortOrder", mapping.sortOrder, stringSchema({}, legacyCompatibility));
 
 	for (const userField of modelConfig.userFields) {
-		properties[userField.key] = userFieldSchema(userField, legacyCompatibility);
+		properties[userField.key] = userFieldProperty(userField, legacyCompatibility);
 		if (userField.defaultValue !== undefined) {
 			applySchemaDefault(properties[userField.key], userField.defaultValue);
 			readDefaults[userField.key] = cloneValue(userField.defaultValue);
@@ -855,26 +1073,68 @@ export async function buildTaskNotesMdbaseTypePack(
 	};
 }
 
+/**
+ * A type's implementation of tasknotes.task as an authority describes it: the
+ * contract's field mapping and binding, with the parts of the implementing
+ * type TaskNotes also reads. mdbase Connect's `describe()` returns each of
+ * these, so a client need not fetch and parse the type document to read it.
+ */
+export interface TaskNotesTaskImplementation {
+	/** Contract field name to the type's own property name. */
+	fields?: Readonly<Record<string, unknown>>;
+	binding?: Readonly<Record<string, unknown>>;
+	/** The implementing type's JSON Schema: the value under `schema.value`. */
+	schema?: Readonly<Record<string, unknown>>;
+	/** The implementing type's `match` rule. */
+	match?: unknown;
+}
+
+export interface TaskNotesModelConfigSources {
+	/**
+	 * Frontmatter of the TaskNotes settings record, when there is one. Its
+	 * fields win over an earlier binding's, which win over `fallback`.
+	 */
+	settings?: Readonly<Record<string, unknown>>;
+}
+
 /** Resolve the TaskNotes configuration advertised by an mdbase task type. */
 export function resolveTaskNotesModelConfigFromMdbaseType(
 	value: unknown,
 	fallback: Partial<TaskNotesModelConfig> = {},
-	options: {
-		/**
-		 * Frontmatter of the TaskNotes settings record, when there is one. Its
-		 * fields win over an earlier binding's, which win over `fallback`.
-		 */
-		settings?: Readonly<Record<string, unknown>>;
-	} = {}
+	options: TaskNotesModelConfigSources = {}
+): TaskNotesModelConfig {
+	const implementation = isRecord(value) ? taskNotesImplementation(value) : undefined;
+	if (!isRecord(value) || !implementation) {
+		return applyStoredAppSettings(resolveModelConfig(fallback), options.settings);
+	}
+	return resolveTaskNotesModelConfigFromImplementation(
+		{
+			fields: isRecord(implementation.fields) ? implementation.fields : undefined,
+			binding: isRecord(implementation.binding) ? implementation.binding : undefined,
+			schema:
+				isRecord(value.schema) && isRecord(value.schema.value)
+					? value.schema.value
+					: undefined,
+			match: value.match,
+		},
+		fallback,
+		options
+	);
+}
+
+/**
+ * Resolve the TaskNotes configuration from a tasknotes.task implementation,
+ * without the type document it came from.
+ */
+export function resolveTaskNotesModelConfigFromImplementation(
+	implementation: TaskNotesTaskImplementation,
+	fallback: Partial<TaskNotesModelConfig> = {},
+	options: TaskNotesModelConfigSources = {}
 ): TaskNotesModelConfig {
 	const base = resolveModelConfig(fallback);
-	if (!isRecord(value)) return applyStoredAppSettings(base, options.settings);
-	const implementation = taskNotesImplementation(value);
-	if (!implementation) return applyStoredAppSettings(base, options.settings);
-	const extension = isRecord(implementation.binding)
-		? implementation.binding
-		: {};
+	const extension = isRecord(implementation.binding) ? implementation.binding : {};
 	const roles = isRecord(implementation.fields) ? implementation.fields : {};
+	const value = { match: implementation.match };
 	const fieldMapping = { ...base.fieldMapping };
 	for (const key of Object.keys(fieldMapping) as (keyof FieldMapping)[]) {
 		const candidate = roles[key];
@@ -882,8 +1142,8 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	}
 
 	const schemaProperties: Record<string, unknown> =
-		isRecord(value.schema) && isRecord(value.schema.value) && isRecord(value.schema.value.properties)
-			? (value.schema.value.properties as Record<string, unknown>)
+		isRecord(implementation.schema) && isRecord(implementation.schema.properties)
+			? (implementation.schema.properties as Record<string, unknown>)
 			: {};
 	const status = isRecord(extension.status) ? extension.status : {};
 	const priority = isRecord(extension.priority) ? extension.priority : {};
@@ -895,14 +1155,17 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	const priorityProperty: Record<string, unknown> = isRecord(rawPriorityProperty)
 		? rawPriorityProperty
 		: {};
-	const statusValues = firstNonEmpty(
-		stringArray(status.values),
-		stringArray(statusProperty.enum)
-	);
-	const priorityValues = firstNonEmpty(
-		stringArray(priority.values),
-		stringArray(priorityProperty.enum)
-	);
+	// The binding describes the vocabulary; the schema decides what a task may
+	// hold. A value only the schema allows is still a status or priority, so it
+	// is read after the described ones instead of being hidden.
+	const statusValues = uniqueStrings([
+		...stringArray(status.values),
+		...schemaEnum(statusProperty),
+	]);
+	const priorityValues = uniqueStrings([
+		...stringArray(priority.values),
+		...schemaEnum(priorityProperty),
+	]);
 	const statuses = resolveStatuses(statusValues, status, base.statuses);
 	const priorities = resolvePriorities(priorityValues, priority, base.priorities);
 	const title = isRecord(extension.title) ? extension.title : {};
@@ -912,6 +1175,10 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 	const taskIdentification = resolveTaskIdentification(value.match, base.taskIdentification);
 	const userFields = resolveUserFields(schemaProperties, fieldMapping, base.userFields);
 	const nlp = isRecord(extension.nlp) ? extension.nlp : {};
+	// Early bindings spelled these in camel case.
+	const materialization =
+		occurrences.default_materialization ?? occurrences.defaultMaterialization;
+	const nextTrigger = occurrences.default_next_trigger ?? occurrences.defaultNextTrigger;
 	const defaultStatus = stringValue(status.default) ?? base.defaults.status;
 	const defaultPriority = stringValue(priority.default) ?? base.defaults.priority;
 
@@ -948,19 +1215,23 @@ export function resolveTaskNotesModelConfigFromMdbaseType(
 		occurrences: {
 			...base.occurrences,
 			defaultMaterialization:
-				occurrences.default_materialization === "manual" ||
-				occurrences.default_materialization === "on_completion" ||
-				occurrences.default_materialization === "rolling"
-					? occurrences.default_materialization
+				materialization === "manual" ||
+				materialization === "on_completion" ||
+				materialization === "rolling"
+					? materialization
 					: base.occurrences.defaultMaterialization,
 			defaultNextTrigger:
-				occurrences.default_next_trigger === "completion" ||
-				occurrences.default_next_trigger === "completion_or_skip"
-					? occurrences.default_next_trigger
+				nextTrigger === "completion" || nextTrigger === "completion_or_skip"
+					? nextTrigger
 					: base.occurrences.defaultNextTrigger,
-			pastHorizon: stringValue(occurrences.past_horizon) ?? base.occurrences.pastHorizon,
+			pastHorizon:
+				stringValue(occurrences.past_horizon) ??
+				stringValue(occurrences.pastHorizon) ??
+				base.occurrences.pastHorizon,
 			futureHorizon:
-				stringValue(occurrences.future_horizon) ?? base.occurrences.futureHorizon,
+				stringValue(occurrences.future_horizon) ??
+				stringValue(occurrences.futureHorizon) ??
+				base.occurrences.futureHorizon,
 		},
 		timeTracking: {
 			...base.timeTracking,
@@ -1018,6 +1289,106 @@ function applyStoredAppSettings(
 			: {}),
 	});
 }
+
+/** Two places in a task type that state the same vocabulary and differ. */
+export interface TaskNotesMdbaseTypeDisagreement {
+	list: "status" | "priority";
+	/** The copy that differs from the binding's. */
+	part: "schema-enum" | "definitions" | "completion-rule" | "schema-default" | "read-default";
+	/** What the contract binding says. */
+	binding: string[];
+	/** What the other copy says. */
+	found: string[];
+}
+
+/**
+ * Where a task type states its statuses, priorities or defaults more than
+ * once and the copies differ. A type written by patchTaskNotesMdbaseTypeSettings
+ * or the generator has none; a hand edit or another tool can leave some. An
+ * authority validates tasks against the schema, so a status only the binding
+ * names is refused when written, and one only the schema names has no label,
+ * colour or completion meaning. Saving the vocabulary through
+ * patchTaskNotesMdbaseTypeSettings rewrites every copy.
+ */
+export function taskNotesMdbaseTypeDisagreements(
+	type: unknown
+): TaskNotesMdbaseTypeDisagreement[] {
+	if (!isRecord(type)) return [];
+	const implementation = taskNotesImplementation(type);
+	if (!implementation || !isRecord(implementation.binding)) return [];
+	const fields = isRecord(implementation.fields) ? implementation.fields : {};
+	const schema =
+		isRecord(type.schema) && isRecord(type.schema.value) ? type.schema.value : {};
+	const properties = isRecord(schema.properties) ? schema.properties : {};
+	const readDefaults =
+		isRecord(type.collection) && isRecord(type.collection.read_defaults)
+			? type.collection.read_defaults
+			: {};
+	const found: TaskNotesMdbaseTypeDisagreement[] = [];
+	const compare = (
+		list: TaskNotesMdbaseTypeDisagreement["list"],
+		part: TaskNotesMdbaseTypeDisagreement["part"],
+		binding: string[],
+		other: string[] | undefined
+	): void => {
+		if (!other) return;
+		const same =
+			binding.length === other.length && binding.every((value) => other.includes(value));
+		if (!same) found.push({ list, part, binding, found: other });
+	};
+
+	for (const list of ["status", "priority"] as const) {
+		const section = isRecord(implementation.binding[list]) ? implementation.binding[list] : {};
+		const field = stringValue(fields[list]) ?? DEFAULT_ROLE_FIELDS[list];
+		const property = properties[field];
+		const values = stringArray(section.values);
+		if (values.length) {
+			const allowed = schemaEnum(property);
+			compare(list, "schema-enum", values, allowed.length ? allowed : undefined);
+			compare(
+				list,
+				"definitions",
+				values,
+				Array.isArray(section.definitions) ? [...definitionMap(section.definitions).keys()] : undefined
+			);
+		}
+		const fallback = stringValue(section.default);
+		if (fallback) {
+			const schemaDefault = readSchemaDefault(property);
+			compare(
+				list,
+				"schema-default",
+				[fallback],
+				typeof schemaDefault === "string" ? [schemaDefault] : undefined
+			);
+			const readDefault = readDefaults[field];
+			compare(
+				list,
+				"read-default",
+				[fallback],
+				typeof readDefault === "string" ? [readDefault] : undefined
+			);
+		}
+		if (list === "status" && Array.isArray(section.completed_values) && Array.isArray(schema.allOf)) {
+			for (const rule of schema.allOf) {
+				const condition =
+					isRecord(rule) && isRecord(rule.if) && isRecord(rule.if.properties)
+						? rule.if.properties[field]
+						: undefined;
+				if (isRecord(condition) && Array.isArray(condition.enum))
+					compare(
+						list,
+						"completion-rule",
+						stringArray(section.completed_values),
+						stringArray(condition.enum)
+					);
+			}
+		}
+	}
+	return found;
+}
+
+const DEFAULT_ROLE_FIELDS = { status: "status", priority: "priority" } as const;
 
 /**
  * The TaskNotes implementation of a type upgraded to the current contract:
@@ -1123,7 +1494,12 @@ function resolveUserFields(
 		const defaultValue = readSchemaDefault(schema);
 		resolved.push({
 			id: existing?.id ?? key,
-			displayName: existing?.displayName ?? humanize(key),
+			// The type's own title is shared by every host; a host's remembered
+			// name only fills in for types written before titles were.
+			displayName:
+				(isRecord(schema) ? stringValue(schema.title) : undefined) ??
+				existing?.displayName ??
+				humanize(key),
 			key,
 			type,
 			...(defaultValue !== undefined ? { defaultValue } : {}),
@@ -1483,6 +1859,14 @@ function resolveStatuses(
 	const completed = new Set(stringArray(policy.completed_values));
 	const skipped = new Set(stringArray(policy.skipped_values));
 	const definitions = definitionMap(policy.definitions);
+	const isSkipped = (value: string): boolean => {
+		const definition = definitions.get(value);
+		return (
+			booleanValue(definition?.is_skipped) ??
+			booleanValue(definition?.isSkipped) ??
+			skipped.has(value)
+		);
+	};
 	return values.length
 		? values.map((value, index) => {
 				const existing = fallback.find((candidate) => candidate.value === value);
@@ -1496,13 +1880,15 @@ function resolveStatuses(
 						? { icon: stringValue(definition?.icon) ?? existing?.icon }
 						: {}),
 					isCompleted:
-						booleanValue(definition?.is_completed) ?? completed.has(value),
-					isSkipped: booleanValue(definition?.is_skipped) ?? skipped.has(value),
+						booleanValue(definition?.is_completed) ??
+						booleanValue(definition?.isCompleted) ??
+						completed.has(value),
+					isSkipped: isSkipped(value),
 					// rc.5 and earlier bindings; rc.6 keeps these in the settings record.
 					excludeFromCycle:
 						booleanValue(definition?.exclude_from_cycle) ??
 						existing?.excludeFromCycle ??
-						(booleanValue(definition?.is_skipped) ?? skipped.has(value)),
+						isSkipped(value),
 					...(stringValue(definition?.next_status) ?? existing?.nextStatus
 						? {
 								nextStatus:
@@ -1730,6 +2116,14 @@ function humanize(value: string): string {
 	return text ? `${text[0].toUpperCase()}${text.slice(1)}` : value;
 }
 
-function firstNonEmpty(primary: string[], fallback: string[]): string[] {
-	return primary.length ? primary : fallback;
+/** The strings a property may hold, wherever a nullable wrapper keeps them. */
+function schemaEnum(property: unknown): string[] {
+	if (!isRecord(property)) return [];
+	if (Array.isArray(property.enum)) return stringArray(property.enum);
+	if (Array.isArray(property.anyOf)) {
+		for (const branch of property.anyOf) {
+			if (isRecord(branch) && Array.isArray(branch.enum)) return stringArray(branch.enum);
+		}
+	}
+	return [];
 }

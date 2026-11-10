@@ -480,7 +480,7 @@ test("projects and resolves the complete portable TaskNotes settings snapshot", 
 	assert.deepEqual(resolved.userFields, [
 		{
 			id: "effort_points",
-			displayName: "Effort points",
+			displayName: "Effort",
 			key: "effort_points",
 			type: "number",
 			defaultValue: 3,

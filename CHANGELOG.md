@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0-rc.21
+
+### Added
+
+- `patchTaskNotesMdbaseTypeSettings` is now the one editor for a TaskNotes task type. It accepts `statuses` and `priorities` (complete lists in display order) and `userFields` (`add`, `rename`, `remove`), and rewrites every place the type repeats them: the schema's allowed values and defaults, the completion rule, the collection's read defaults, the binding's `values`, `completed_values`, `skipped_values`, `default_skipped` and `definitions`, and the generator's `managed_fields`. A default named in the same patch may be one of the new values. The result equals what `buildTaskNotesMdbaseResources` generates for the same settings, in canonical and migrated-v0.2 types; definition keys and properties the patch does not name are kept.
+- Vocabulary helpers, exported from `@tasknotes/model/mdbase`: `taskNotesVocabularyProblem` (empty label, duplicate value, no open or no completed status, a status both completed and skipped, no priority, a removed default), `taskNotesVocabularyInUse` (the first removed status or priority tasks still hold), `taskNotesVocabularyValue` and `taskNotesUserFieldKey` (a stored value or property name from a label), `TaskNotesVocabularyError`, `TaskNotesVocabularyInUseError` and the `isTaskNotesVocabularyError` / `isTaskNotesVocabularyInUseError` guards.
+- `taskNotesMdbaseTypeDisagreements` reports where a type states its statuses, priorities or defaults more than once and the copies differ (schema enum, definitions, completion rule, schema default, read default against the binding).
+- `resolveTaskNotesModelConfigFromImplementation` resolves the configuration from a tasknotes.task implementation (`fields`, `binding`, the type's schema and `match`), which is what an authority's catalog returns, without the type document. `resolveTaskNotesModelConfigFromMdbaseType` now delegates to it.
+
+### Changed
+
+- A custom field's display name is written to the type as the property's `title`, and read from it before the host's remembered name. Names now reach other TaskNotes hosts; types written earlier keep the host's name until they are next written.
+- A status or priority only the schema allows (not in the binding's `values`) is read after the described ones instead of being hidden, so hosts show it and saving the list repairs the type.
+- The camel-case spellings early bindings used (`isCompleted`, `isSkipped`, `defaultMaterialization`, `defaultNextTrigger`, `pastHorizon`, `futureHorizon`) are read after the current ones.
+
 ## 0.3.0-rc.20
 
 Implements tasknotes-spec 0.3.0-rc.6 (`tasknotes.task` 0.3.0-rc.6).
