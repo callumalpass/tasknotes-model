@@ -4,6 +4,7 @@ import {
 	buildTaskNotesMdbaseResources,
 	isTaskNotesVocabularyError,
 	patchTaskNotesMdbaseTypeSettings,
+	reconcileTaskNotesMdbaseTypeVocabulary,
 	resolveTaskNotesModelConfigFromImplementation,
 	resolveTaskNotesModelConfigFromMdbaseType,
 	taskNotesMdbaseTypeDisagreements,
@@ -497,4 +498,48 @@ test("reads the camel-case spellings early bindings used", () => {
 			futureHorizon: "P30D",
 		}
 	);
+});
+
+test("reconciling a type makes its copies agree without taking a value away", () => {
+	const generated = buildTaskNotesMdbaseResources().type;
+	assert.equal(reconcileTaskNotesMdbaseTypeVocabulary(generated), generated);
+
+	const type = JSON.parse(JSON.stringify(generated));
+	const binding = type.implements[0].binding;
+	type.schema.value.properties.status.enum.push("blocked");
+	binding.status.values.push("waiting");
+	binding.status.completed_values.push("waiting");
+	binding.status.definitions[1].order = 7;
+	binding.status.default = "none";
+	type.schema.value.properties.priority.enum.push("urgent");
+	binding.priority.definitions[0].icon = "minus";
+
+	const reconciled = reconcileTaskNotesMdbaseTypeVocabulary(type);
+	const status = reconciled.implements[0].binding.status;
+
+	assert.deepEqual(taskNotesMdbaseTypeDisagreements(reconciled), []);
+	assert.deepEqual(status.values, ["none", "open", "in-progress", "done", "waiting", "blocked"]);
+	assert.deepEqual(reconciled.schema.value.properties.status.enum, status.values);
+	assert.deepEqual(status.completed_values, ["done", "waiting"]);
+	assert.deepEqual(reconciled.schema.value.allOf[0].if.properties.status.enum, ["done", "waiting"]);
+	assert.equal(reconciled.schema.value.properties.status.default, "none");
+	assert.equal(reconciled.collection.read_defaults.status, "none");
+	assert.equal(status.definitions[1].order, 7);
+	assert.equal(reconciled.implements[0].binding.priority.definitions[0].icon, "minus");
+	assert.deepEqual(reconciled.implements[0].binding.priority.values, [
+		"none",
+		"low",
+		"normal",
+		"high",
+		"urgent",
+	]);
+	// The type handed in is not changed.
+	assert.equal(type.schema.value.properties.status.default, "open");
+
+	// A vocabulary that cannot be made valid is left for a person to fix.
+	const broken = JSON.parse(JSON.stringify(generated));
+	broken.implements[0].binding.status.completed_values = [];
+	for (const definition of broken.implements[0].binding.status.definitions)
+		definition.is_completed = false;
+	assert.equal(reconcileTaskNotesMdbaseTypeVocabulary(broken), broken);
 });

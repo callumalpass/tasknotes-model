@@ -22,6 +22,7 @@ import type {
 	UserMappedField,
 } from "./types";
 import {
+	isTaskNotesVocabularyError,
 	TASKNOTES_USER_FIELD_KEY,
 	TaskNotesVocabularyError,
 	taskNotesVocabularyProblem,
@@ -1389,6 +1390,41 @@ export function taskNotesMdbaseTypeDisagreements(
 }
 
 const DEFAULT_ROLE_FIELDS = { status: "status", priority: "priority" } as const;
+
+/**
+ * A type whose copies of the vocabulary agree. Nothing a task may hold today
+ * is taken away: a status or priority that only one copy names is kept, the
+ * binding's description of each value wins, and the binding's defaults and
+ * completed statuses are written to the schema. A type with no disagreement,
+ * or one whose vocabulary cannot be made valid, is returned as it is.
+ */
+export function reconcileTaskNotesMdbaseTypeVocabulary(
+	type: Record<string, unknown>
+): Record<string, unknown> {
+	if (!taskNotesMdbaseTypeDisagreements(type).length) return type;
+	const config = resolveTaskNotesModelConfigFromMdbaseType(type);
+	try {
+		return patchTaskNotesMdbaseTypeSettings(type, {
+			statuses: config.statuses.map((status) => ({
+				value: status.value,
+				label: status.label,
+				color: status.color,
+				isCompleted: status.isCompleted,
+				isSkipped: status.isSkipped === true,
+				order: status.order,
+			})),
+			priorities: config.priorities.map((priority) => ({
+				value: priority.value,
+				label: priority.label,
+				color: priority.color,
+				weight: priority.weight,
+			})),
+		});
+	} catch (error) {
+		if (isTaskNotesVocabularyError(error)) return type;
+		throw error;
+	}
+}
 
 /**
  * The TaskNotes implementation of a type upgraded to the current contract:
