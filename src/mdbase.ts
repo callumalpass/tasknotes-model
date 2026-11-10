@@ -381,16 +381,12 @@ function applyVocabularyPatch(
 		setSchemaEnum(properties[field], values, defaults.status);
 		readDefaults[field] = defaults.status;
 		// The type requires a completion date for exactly the completed statuses.
-		if (Array.isArray(schema.allOf)) {
-			for (const rule of schema.allOf) {
-				const condition =
-					isRecord(rule) && isRecord(rule.if) && isRecord(rule.if.properties)
-						? rule.if.properties[field]
-						: undefined;
-				if (isRecord(condition) && Array.isArray(condition.enum))
-					condition.enum = [...completed];
-			}
-		}
+		for (const condition of completionRuleConditions(
+			schema,
+			field,
+			model.fieldMapping.completedDate
+		))
+			condition.enum = [...completed];
 	}
 
 	if (patch.priorities) {
@@ -1370,26 +1366,44 @@ export function taskNotesMdbaseTypeDisagreements(
 				typeof readDefault === "string" ? [readDefault] : undefined
 			);
 		}
-		if (list === "status" && Array.isArray(section.completed_values) && Array.isArray(schema.allOf)) {
-			for (const rule of schema.allOf) {
-				const condition =
-					isRecord(rule) && isRecord(rule.if) && isRecord(rule.if.properties)
-						? rule.if.properties[field]
-						: undefined;
-				if (isRecord(condition) && Array.isArray(condition.enum))
-					compare(
-						list,
-						"completion-rule",
-						stringArray(section.completed_values),
-						stringArray(condition.enum)
-					);
-			}
+		if (list === "status" && Array.isArray(section.completed_values)) {
+			const completedDate = stringValue(fields.completedDate) ?? "completedDate";
+			for (const condition of completionRuleConditions(schema, field, completedDate))
+				compare(
+					list,
+					"completion-rule",
+					stringArray(section.completed_values),
+					stringArray(condition.enum)
+				);
 		}
 	}
 	return found;
 }
 
 const DEFAULT_ROLE_FIELDS = { status: "status", priority: "priority" } as const;
+
+/**
+ * The status conditions of the rules that require a completion date: the rule
+ * the generator writes, wherever a host has moved it. Another rule that
+ * happens to test the status is the collection's own and is left alone.
+ */
+function completionRuleConditions(
+	schema: Record<string, unknown>,
+	statusField: string,
+	completedDateField: string
+): Array<Record<string, unknown> & { enum: unknown[] }> {
+	if (!Array.isArray(schema.allOf)) return [];
+	const conditions: Array<Record<string, unknown> & { enum: unknown[] }> = [];
+	for (const rule of schema.allOf) {
+		if (!isRecord(rule) || !isRecord(rule.if) || !isRecord(rule.if.properties)) continue;
+		const required = isRecord(rule.then) ? rule.then.required : undefined;
+		if (!Array.isArray(required) || !required.includes(completedDateField)) continue;
+		const condition = rule.if.properties[statusField];
+		if (isRecord(condition) && Array.isArray(condition.enum))
+			conditions.push(condition as Record<string, unknown> & { enum: unknown[] });
+	}
+	return conditions;
+}
 
 /**
  * A type whose copies of the vocabulary agree. Nothing a task may hold today

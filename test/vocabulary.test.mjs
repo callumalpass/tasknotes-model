@@ -172,6 +172,28 @@ test("an edit keeps what it does not name", () => {
 	assert.equal(type.schema.value.properties.client.title, undefined);
 });
 
+test("an edit leaves the collection's own rules about a status alone", () => {
+	const type = JSON.parse(JSON.stringify(buildTaskNotesMdbaseResources().type));
+	const own = {
+		if: { required: ["status"], properties: { status: { enum: ["open"] } } },
+		then: { required: ["scheduled"] },
+	};
+	type.schema.value.allOf.push(own);
+
+	assert.deepEqual(taskNotesMdbaseTypeDisagreements(type), []);
+	const edited = patchTaskNotesMdbaseTypeSettings(type, {
+		statuses: [
+			{ value: "open", label: "Open", color: "#808080", isCompleted: false },
+			{ value: "done", label: "Done", color: "#00aa00", isCompleted: true },
+			{ value: "shipped", label: "Shipped", color: "#0000aa", isCompleted: true },
+		],
+	});
+
+	assert.deepEqual(edited.schema.value.allOf[0].if.properties.status.enum, ["done", "shipped"]);
+	assert.deepEqual(edited.schema.value.allOf[1], own);
+	assert.deepEqual(taskNotesMdbaseTypeDisagreements(edited), []);
+});
+
 test("a status that stops being skipped leaves the skipped list", () => {
 	const type = buildTaskNotesMdbaseResources().type;
 	type.implements[0].binding.status.skipped_values = ["none"];

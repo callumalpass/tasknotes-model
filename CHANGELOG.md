@@ -14,6 +14,8 @@
 - A custom field's display name is written to the type as the property's `title`, and read from it before the host's remembered name. Names now reach other TaskNotes hosts; types written earlier keep the host's name until they are next written.
 - A status or priority only the schema allows (not in the binding's `values`) is read after the described ones instead of being hidden, so hosts show it and saving the list repairs the type.
 - The camel-case spellings early bindings used (`isCompleted`, `isSkipped`, `defaultMaterialization`, `defaultNextTrigger`, `pastHorizon`, `futureHorizon`) are read after the current ones.
+- Only a rule that requires the completion date is treated as the completion rule. Another `allOf` rule that tests the status is the collection's own: an edit to the statuses leaves it as written, and it is not reported as a disagreement.
+
 
 ## 0.3.0-rc.20
 
