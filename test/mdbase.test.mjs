@@ -95,6 +95,28 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	assert.deepEqual(YAML.parse(contractFrontmatter[1]), resources.contract);
 });
 
+test("keeps the standalone schemas pack-managed and inline in the contract", async () => {
+	// Hosts never write the schema files: the pack manages both paths, and
+	// the contract carries both schemas, so a collection without the files
+	// is complete.
+	const resources = buildTaskNotesMdbaseResources();
+	const pack = await buildTaskNotesMdbaseTypePack(resources);
+	for (const [target, document] of [
+		[resources.paths.taskSchema, resources.taskSchemaDocument],
+		[resources.paths.bindingSchema, resources.bindingSchemaDocument],
+	]) {
+		const resource = pack.manifest.resources.find((entry) => entry.target === target);
+		assert.equal(resource?.kind, "schema");
+		assert.equal(resource?.mode, "managed");
+		assert.equal(
+			pack.resources.find(({ source }) => source === resource.source)?.document,
+			document
+		);
+	}
+	assert.deepEqual(resources.contract.record_schema.value, resources.taskSchema);
+	assert.deepEqual(resources.contract.binding_schema.value, resources.bindingSchema);
+});
+
 test("packages the contract, implementation, and schemas as one digest-pinned type pack", async () => {
 	const resources = buildTaskNotesMdbaseResources({ typeName: "action" });
 	const pack = await buildTaskNotesMdbaseTypePack(resources);

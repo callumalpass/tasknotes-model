@@ -121,13 +121,24 @@ export interface TaskNotesMdbaseResources {
 	configDocument: string;
 	contractDocument: string;
 	typeDocument: string;
+	/**
+	 * The task schema as a standalone JSON document: a resource of the
+	 * tasknotes.task type pack (see buildTaskNotesMdbaseTypePack), which a
+	 * connector installs with a receipt. Hosts never write it to
+	 * `paths.taskSchema` as a plain file. mdbase setup refuses a plain file at
+	 * a path the pack manages unless it holds these exact bytes, and the
+	 * contract already carries the schema inline as `record_schema`.
+	 */
 	taskSchemaDocument: string;
+	/** The binding schema as a standalone JSON document; a type-pack resource like `taskSchemaDocument`. */
 	bindingSchemaDocument: string;
 	paths: {
 		config: "mdbase.yaml";
 		contract: string;
 		type: string;
+		/** Where the tasknotes.task type pack installs `taskSchemaDocument`. Not a host-written file. */
 		taskSchema: string;
+		/** Where the tasknotes.task type pack installs `bindingSchemaDocument`. Not a host-written file. */
 		bindingSchema: string;
 		records: string;
 	};
@@ -505,7 +516,9 @@ function userFieldProperty(
  *
  * Hosts provide their effective TaskNotes settings and perform the actual IO.
  * The returned object model is authoritative; the documents are deterministic
- * serializations for filesystem-backed collections.
+ * serializations for filesystem-backed collections. The two schema documents
+ * are the exception: they are tasknotes.task type-pack resources, and a host
+ * does not write them itself (see `taskSchemaDocument`).
  */
 export function buildTaskNotesMdbaseResources(
 	options: TaskNotesMdbaseOptions = {}
