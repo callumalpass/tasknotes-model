@@ -58,7 +58,30 @@ The package exports both the root module and focused subpath modules:
 | `@tasknotes/model/frontmatter` | Markdown task document parse/serialize helpers |
 | `@tasknotes/model/mdbase` | Canonical mdbase v0.3 config, contract, schema, and implementing-type generation; reading a type or implementation into a configuration; `patchTaskNotesMdbaseTypeSettings`, the one editor for a task type's settings, statuses, priorities and custom fields |
 | `@tasknotes/model/starter` | The published TaskNotes starter type (`tasknotes.task` pack seed), pinned to mdbase-contracts by the test suite. Use it, not the plugin defaults in `defaults`, to build starter types |
+| `@tasknotes/model/settings` | Shared app-settings paths, resolution, patches, conflicts and published TaskNotes settings resources |
 | `@tasknotes/model/conformance` | tasknotes-spec conformance operation dispatcher |
+
+## Collection metadata and settings
+
+New collection resources explicitly use `_mdbase/types`, `_mdbase/contracts` and
+`_mdbase/settings/<app>.md`. Schema resources are placed under the parent of the
+contracts folder. Existing collections keep their configured layout; when reading
+an existing config, the mdbase spec defaults remain `_types` and `_contracts`.
+Pass those existing folders to the resource builders instead of adopting the
+new-collection defaults.
+
+Check `appSettingsPath(app)` and `legacyAppSettingsPath(app)`, then call
+`resolveAppSettingsPath(app, { currentExists, legacyExists })`. Read and save the
+returned path: new wins when both exist, legacy wins when only it exists, and
+creation uses the new path. Never move a record or fall back merely because its
+contents are invalid. Pass the selected path to `resolveAppSettings` as its third
+argument, or to `resolveTaskNotesAppSettings` as `options.path`, so messages name
+the record actually read.
+
+`buildTaskNotesMdbaseTypePack` carries the published rc.21 settings resources,
+retained contracts and schemas, and seed upgrade history. Its `provides` includes
+`tasknotes.settings` 1.1.0 and `mdbase.app-settings` 2.0.0 alongside `tasknotes.task`.
+The settings type is version 2; the record's `settings_version` remains 1.
 
 ## Calendar contract
 

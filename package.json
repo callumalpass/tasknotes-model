@@ -1,6 +1,6 @@
 {
 	"name": "@tasknotes/model",
-	"version": "0.3.0-rc.21",
+	"version": "0.3.0-rc.22",
 	"description": "TaskNotes model, mapping, validation, recurrence, and operation-planning reference implementation.",
 	"license": "MIT",
 	"type": "module",
@@ -138,6 +138,7 @@
 	"scripts": {
 		"clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
 		"sync:mdbase-contract": "node scripts/sync-tasknotes-contract.mjs",
+		"sync:mdbase-pack": "node scripts/sync-tasknotes-pack.mjs",
 		"build": "npm run clean && node scripts/build.mjs && tsc -p tsconfig.types.json",
 		"prepack": "npm run build",
 		"typecheck": "tsc -p tsconfig.types.json --emitDeclarationOnly false --noEmit",

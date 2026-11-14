@@ -1,4 +1,5 @@
 import YAML from "yaml";
+import tasknotesTypePack from "./generated/tasknotes-type-pack.json";
 import { resolveModelConfig } from "./config";
 import {
 	TASKNOTES_TASK_BINDING_SCHEMA,
@@ -164,10 +165,15 @@ export interface TaskNotesMdbaseTypePack {
 			source: string;
 			target: string;
 			digest: string;
+			upgrade_from?: Array<{ digest: string; version: number; document: string }>;
 		}>;
 	};
 	resources: Array<{ source: string; document: string }>;
-	provides: Array<{ id: "tasknotes.task"; version: string; digest: string }>;
+	provides: Array<{
+		id: "tasknotes.task" | "tasknotes.settings" | "mdbase.app-settings";
+		version: string;
+		digest: string;
+	}>;
 }
 
 /**
@@ -178,7 +184,7 @@ export interface TaskNotesMdbaseTypePack {
 export const TASKNOTES_MDBASE_TYPE_VERSION = 5;
 
 /** Version of the generated definition bundle, independent of contract version. */
-export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.19";
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.21";
 export const TASKNOTES_CONTRACT_DIGEST =
 	"sha256:c400ead6e218b715d86ad31125bb3d4b2e276817da6ba8065449fd0947b24d67";
 
@@ -525,13 +531,14 @@ export function buildTaskNotesMdbaseResources(
 ): TaskNotesMdbaseResources {
 	const typeName = cleanSegment(options.typeName ?? "task", "typeName");
 	const tasksFolder = cleanOptionalPath(options.tasksFolder ?? "tasks", "tasksFolder");
-	const typesFolder = cleanPath(options.typesFolder ?? "_types", "typesFolder");
+	const typesFolder = cleanPath(options.typesFolder ?? "_mdbase/types", "typesFolder");
 	const contractsFolder = cleanPath(
-		options.contractsFolder ?? "_contracts",
+		options.contractsFolder ?? "_mdbase/contracts",
 		"contractsFolder"
 	);
 	const schemasFolder = cleanPath(
-		options.schemasFolder ?? "_schemas/tasknotes",
+		options.schemasFolder ??
+			[...contractsFolder.split("/").slice(0, -1), "_schemas/tasknotes"].join("/"),
 		"schemasFolder"
 	);
 	if (contractsFolder === typesFolder) {
@@ -1009,37 +1016,6 @@ export function buildTaskNotesMdbaseResources(
 export async function buildTaskNotesMdbaseTypePack(
 	resources: TaskNotesMdbaseResources
 ): Promise<TaskNotesMdbaseTypePack> {
-	const typeSource = `types/${resources.paths.type.split("/").slice(-1)[0]}`;
-	const definitions = [
-		{
-			kind: "contract" as const,
-			mode: "managed" as const,
-			source: `contracts/tasknotes.task/${TASKNOTES_SPEC_VERSION}.md`,
-			target: resources.paths.contract,
-			document: resources.contractDocument,
-		},
-		{
-			kind: "type" as const,
-			mode: "seed" as const,
-			source: typeSource,
-			target: resources.paths.type,
-			document: resources.typeDocument,
-		},
-		{
-			kind: "schema" as const,
-			mode: "managed" as const,
-			source: "schemas/tasknotes-task.schema.json",
-			target: resources.paths.taskSchema,
-			document: resources.taskSchemaDocument,
-		},
-		{
-			kind: "schema" as const,
-			mode: "managed" as const,
-			source: "schemas/tasknotes-task-binding.schema.json",
-			target: resources.paths.bindingSchema,
-			document: resources.bindingSchemaDocument,
-		},
-	];
 	const contractDigest = await sha256(canonicalJson({
 		kind: "mdbase.contract",
 		contract_type: "record",
@@ -1053,34 +1029,41 @@ export async function buildTaskNotesMdbaseTypePack(
 			"The TaskNotes contract changed without updating TASKNOTES_CONTRACT_DIGEST."
 		);
 	}
-	return {
-		manifest: {
-			kind: "mdbase.type-pack",
-			id: "tasknotes.task",
-			version: TASKNOTES_MDBASE_PACK_VERSION,
-			name: "TaskNotes task",
-			description:
-				"TaskNotes task contract, implementation, and referenced JSON Schemas.",
-			resources: await Promise.all(
-				definitions.map(async ({ kind, mode, source, target, document }) => ({
-					kind,
-					mode,
-					source,
-					target,
-					digest: await sha256(document),
-				}))
-			),
-		},
-		resources: definitions.map(({ source, document }) => ({
-			source,
-			document,
-		})),
-		provides: [{
-			id: "tasknotes.task",
-			version: TASKNOTES_SPEC_VERSION,
-			digest: contractDigest,
+	const pack = structuredClone(tasknotesTypePack) as TaskNotesMdbaseTypePack;
+	const typesFolder = resources.paths.type.split("/").slice(0, -1).join("/");
+	const contractsFolder = resources.paths.contract.split("/").slice(0, -2).join("/");
+	const schemaParent = contractsFolder.split("/").slice(0, -1);
+	const overrides = new Map([
+		[`contracts/tasknotes.task/${TASKNOTES_SPEC_VERSION}.md`, {
+			target: resources.paths.contract, document: resources.contractDocument,
 		}],
-	};
+		["types/tasknotes-task/6.md", {
+			target: resources.paths.type, document: resources.typeDocument,
+		}],
+		[`schemas/tasknotes.task/${TASKNOTES_SPEC_VERSION}.schema.json`, {
+			target: resources.paths.taskSchema, document: resources.taskSchemaDocument,
+		}],
+		[`schemas/tasknotes.task.binding/${TASKNOTES_SPEC_VERSION}.schema.json`, {
+			target: resources.paths.bindingSchema, document: resources.bindingSchemaDocument,
+		}],
+	]);
+	for (const declaration of pack.manifest.resources) {
+		const resource = pack.resources.find((entry) => entry.source === declaration.source);
+		if (!resource) throw new Error(`Missing published pack resource: ${declaration.source}`);
+		const override = overrides.get(declaration.source);
+		if (override) {
+			declaration.target = override.target;
+			resource.document = override.document;
+		} else if (declaration.target.startsWith("_types/")) {
+			declaration.target = `${typesFolder}/${declaration.target.slice("_types/".length)}`;
+		} else if (declaration.target.startsWith("_contracts/")) {
+			declaration.target = `${contractsFolder}/${declaration.target.slice("_contracts/".length)}`;
+		} else if (declaration.kind === "schema") {
+			declaration.target = [...schemaParent, declaration.target].join("/");
+		}
+		declaration.digest = await sha256(resource.document);
+	}
+	return pack;
 }
 
 /**

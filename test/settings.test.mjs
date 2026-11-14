@@ -3,15 +3,47 @@ import test from "node:test";
 import { buildTaskNotesMdbaseResources, resolveTaskNotesModelConfigFromMdbaseType, upgradeTaskNotesMdbaseTypeContract } from "../dist/esm/mdbase.js";
 import {
 	absentTaskNotesSettingsPatch,
+	APP_SETTINGS_FOLDER,
+	appSettingsPath,
 	buildTaskNotesSettingsPatch,
 	buildTaskNotesSettingsResources,
 	conflictingTaskNotesSettings,
 	newTaskNotesSettingsFrontmatter,
+	LEGACY_APP_SETTINGS_FOLDER,
+	legacyAppSettingsPath,
 	readAppSettingsFrontmatter,
 	resolveTaskNotesAppSettings,
+	resolveAppSettingsPath,
+	TASKNOTES_SETTINGS_SCHEMA,
 	TASKNOTES_SETTINGS_PATH,
 	writeAppSettingsDocument,
 } from "../dist/esm/settings.js";
+
+test("resolves one settings path for both reads and saves without moving records", () => {
+	assert.equal(APP_SETTINGS_FOLDER, "_mdbase/settings");
+	assert.equal(LEGACY_APP_SETTINGS_FOLDER, "_settings");
+	for (const app of ["dev.tasknotes", "dev.mdbase.reader"]) {
+		assert.equal(appSettingsPath(app), `_mdbase/settings/${app}.md`);
+		assert.equal(legacyAppSettingsPath(app), `_settings/${app}.md`);
+		for (const [currentExists, legacyExists, expected] of [
+			[true, true, appSettingsPath(app)],
+			[true, false, appSettingsPath(app)],
+			[false, true, legacyAppSettingsPath(app)],
+			[false, false, appSettingsPath(app)],
+		]) {
+			assert.equal(resolveAppSettingsPath(app, { currentExists, legacyExists }), expected);
+		}
+	}
+});
+
+test("read-only messages name the settings path actually read", () => {
+	for (const path of [appSettingsPath("dev.tasknotes"), legacyAppSettingsPath("dev.tasknotes")]) {
+		for (const invalid of [{ app: "dev.other" }, { scope: "user" }]) {
+			assert.ok(resolveTaskNotesAppSettings(record(invalid), { path }).readOnly.startsWith(path));
+		}
+	}
+	assert.ok(resolveTaskNotesAppSettings(record({ app: "dev.other" })).readOnly.startsWith(TASKNOTES_SETTINGS_PATH));
+});
 
 // An rc.5 binding still carries the settings rc.6 moved to the record.
 function legacyBinding() {
@@ -140,11 +172,35 @@ test("a migration adds only the fields an existing record lacks", () => {
 test("publishes the settings contract, schema and type", () => {
 	const resources = buildTaskNotesSettingsResources();
 	assert.equal(resources.paths.record, TASKNOTES_SETTINGS_PATH);
-	assert.equal(TASKNOTES_SETTINGS_PATH, "_settings/dev.tasknotes.md");
+	assert.equal(TASKNOTES_SETTINGS_PATH, "_mdbase/settings/dev.tasknotes.md");
+	assert.equal(resources.paths.type, "_mdbase/types/tasknotes-settings.md");
+	assert.equal(resources.paths.contract, "_mdbase/contracts/tasknotes.settings/1.1.0.md");
+	assert.equal(resources.paths.schema, "_mdbase/schemas/tasknotes.settings/1.1.0.schema.json");
 	assert.deepEqual(resources.type.collection, { unique: [{ field: "app", scope: "type" }] });
 	assert.deepEqual(resources.type.implements.map(({ contract, version }) => `${contract}@${version}`), [
-		"mdbase.app-settings@1.0.0",
-		"tasknotes.settings@1.0.0",
+		"mdbase.app-settings@2.0.0",
+		"tasknotes.settings@1.1.0",
 	]);
+	assert.equal(resources.type.version, 2);
 	assert.equal(resources.type.schema.value.title, "tasknotes.settings 1.0.0");
+	assert.deepEqual(resources.type.schema.value, TASKNOTES_SETTINGS_SCHEMA);
+	assert.equal(resources.contract.record_schema.ref, undefined);
+	assert.equal(resources.contract.record_schema.value.title, "tasknotes.settings 1.1.0");
+	assert.deepEqual(JSON.parse(resources.schemaDocument), resources.contract.record_schema.value);
+	assert.deepEqual(readAppSettingsFrontmatter(resources.contractDocument), resources.contract);
+	assert.deepEqual(readAppSettingsFrontmatter(resources.typeDocument), resources.type);
+	assert.match(resources.contractDocument, /_settings\/dev.tasknotes.md/);
+	assert.match(resources.typeDocument, /_settings\/dev.tasknotes.md/);
+});
+
+test("settings support schemas follow the parent of the configured contracts folder", () => {
+	for (const [contractsFolder, schemaParent] of [
+		["_contracts", ""],
+		["System/mdbase/contracts", "System/mdbase/"],
+	]) {
+		const resources = buildTaskNotesSettingsResources({ typesFolder: "Definitions", contractsFolder });
+		assert.equal(resources.paths.type, "Definitions/tasknotes-settings.md");
+		assert.equal(resources.paths.contract, `${contractsFolder}/tasknotes.settings/1.1.0.md`);
+		assert.equal(resources.paths.schema, `${schemaParent}schemas/tasknotes.settings/1.1.0.schema.json`);
+	}
 });

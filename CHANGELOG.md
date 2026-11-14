@@ -1,9 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.3.0-rc.22
+
+### Added
+
+- `LEGACY_APP_SETTINGS_FOLDER`, `legacyAppSettingsPath(app)` and `resolveAppSettingsPath(app, { currentExists, legacyExists })`, exported from the root and `@tasknotes/model/settings`. The resolver chooses the new path when it exists, otherwise the legacy path when it exists, otherwise the new path for creation. Clients read and save the selected record without moving it.
 
 ### Changed
 
+- **New-collection layout:** `APP_SETTINGS_FOLDER` and `appSettingsPath` / `TASKNOTES_SETTINGS_PATH` now use `_mdbase/settings`. New collection resources explicitly default to `_mdbase/types` and `_mdbase/contracts`; schema files follow the parent of the contracts folder. Existing collections keep their configured folders (or the unchanged mdbase spec defaults `_types` / `_contracts`); clients must use the path resolver rather than creating a second settings record.
+- Settings resources implement `mdbase.app-settings` 2.0.0 and `tasknotes.settings` 1.1.0 with settings type version 2. The record's `settings_version` remains 1. `resolveAppSettings` accepts the path read as its third argument, and `resolveTaskNotesAppSettings` accepts `options.path`, so read-only messages identify the actual record.
+- Vendor the `tasknotes.task` 0.3.0-rc.21 pack from mdbase-contracts PR #23 (`c50a6d08d975b02891fdb8f9c9f08011179efd51`). Generated packs now include the published settings resources, retained contracts/schemas and seed upgrade history, with configured folder targets and byte-identical support documents. `provides` includes the settings contracts as well as `tasknotes.task`. Refresh the vendored artifact with `MDBASE_CONTRACTS_ROOT=<checkout> npm run sync:mdbase-pack` after building that checkout's `dist/`.
 - Documented `taskSchemaDocument`, `bindingSchemaDocument`, `paths.taskSchema` and `paths.bindingSchema` as tasknotes.task type-pack resources. A host must not write them as plain files: mdbase setup refuses a plain file at a path the pack manages unless it holds the exact resource bytes (tasknotes-app #436). The contract already carries both schemas inline.
 
 ## 0.3.0-rc.21
