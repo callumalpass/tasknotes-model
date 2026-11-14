@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Documented `taskSchemaDocument`, `bindingSchemaDocument`, `paths.taskSchema` and `paths.bindingSchema` as tasknotes.task type-pack resources. A host must not write them as plain files: mdbase setup refuses a plain file at a path the pack manages unless it holds the exact resource bytes (tasknotes-app #436). The contract already carries both schemas inline.
+
 ## 0.3.0-rc.21
 
 ### Added
