@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import YAML from "yaml";
 import {
@@ -6,6 +7,7 @@ import {
 	buildTaskNotesMdbaseTypePack,
 	patchTaskNotesMdbaseTypeSettings,
 	resolveTaskNotesModelConfigFromMdbaseType,
+	TASKNOTES_MDBASE_PACK_VERSION,
 } from "../dist/esm/mdbase.js";
 
 function implementation(type) {
@@ -27,7 +29,11 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	const schema = type.schema.value;
 
 	assert.equal(resources.config.spec_version, "0.3.0");
-	assert.equal(resources.config.settings.contracts_folder, "_contracts");
+	assert.equal(resources.config.settings.types_folder, "_mdbase/types");
+	assert.equal(resources.config.settings.contracts_folder, "_mdbase/contracts");
+	assert.equal(resources.paths.contract, "_mdbase/contracts/tasknotes.task/0.3.0-rc.6.md");
+	assert.equal(resources.paths.type, "_mdbase/types/task.md");
+	assert.equal(resources.paths.taskSchema, "_mdbase/_schemas/tasknotes/tasknotes-task.schema.json");
 	assert.equal(resources.contract.id, "tasknotes.task");
 	assert.equal(resources.contract.contract_type, "record");
 	assert.equal(resources.contract.version, "0.3.0-rc.6");
@@ -121,36 +127,60 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	const resources = buildTaskNotesMdbaseResources({ typeName: "action" });
 	const pack = await buildTaskNotesMdbaseTypePack(resources);
 
-	assert.deepEqual(pack.provides, [
-		{
-			id: "tasknotes.task",
-			version: "0.3.0-rc.6",
-			digest: pack.provides[0].digest,
-		},
+	assert.deepEqual(pack.provides.map(({ id, version }) => [id, version]), [
+		["tasknotes.task", "0.3.0-rc.6"],
+		["tasknotes.settings", "1.1.0"],
+		["mdbase.app-settings", "2.0.0"],
 	]);
 	assert.match(pack.provides[0].digest, /^sha256:[0-9a-f]{64}$/);
 	assert.equal(pack.manifest.kind, "mdbase.type-pack");
 	assert.equal(pack.manifest.id, "tasknotes.task");
-	assert.equal(pack.manifest.resources.length, 4);
+	assert.equal(pack.manifest.version, TASKNOTES_MDBASE_PACK_VERSION);
+	assert.equal(TASKNOTES_MDBASE_PACK_VERSION, "0.3.0-rc.21");
+	assert.equal(pack.manifest.resources.length, 14);
 	assert.deepEqual(
-		pack.manifest.resources.map(({ kind, mode, target }) => [kind, mode, target]),
+		pack.manifest.resources.filter(({ source }) => [
+			"contracts/tasknotes.task/0.3.0-rc.6.md", "types/tasknotes-task/6.md",
+			"schemas/tasknotes.task/0.3.0-rc.6.schema.json", "schemas/tasknotes.task.binding/0.3.0-rc.6.schema.json",
+		].includes(source)).map(({ kind, mode, target }) => [kind, mode, target]),
 		[
-			["contract", "managed", "_contracts/tasknotes.task/0.3.0-rc.6.md"],
-			["type", "seed", "_types/action.md"],
-			["schema", "managed", "_schemas/tasknotes/tasknotes-task.schema.json"],
+			["contract", "managed", "_mdbase/contracts/tasknotes.task/0.3.0-rc.6.md"],
+			["type", "seed", "_mdbase/types/action.md"],
+			["schema", "managed", "_mdbase/_schemas/tasknotes/tasknotes-task.schema.json"],
 			[
 				"schema",
 				"managed",
-				"_schemas/tasknotes/tasknotes-task-binding.schema.json",
+				"_mdbase/_schemas/tasknotes/tasknotes-task-binding.schema.json",
 			],
 		]
 	);
 	for (const declared of pack.manifest.resources) {
 		assert.match(declared.digest, /^sha256:[0-9a-f]{64}$/);
-		assert.ok(
-			pack.resources.some((resource) => resource.source === declared.source)
-		);
+		const resource = pack.resources.find((resource) => resource.source === declared.source);
+		assert.ok(resource);
+		assert.equal(declared.digest, `sha256:${createHash("sha256").update(resource.document).digest("hex")}`);
 	}
+});
+
+test("pack support resources follow explicit legacy or nested collection folders", async () => {
+	for (const [typesFolder, contractsFolder, schemaParent] of [
+		["_types", "_contracts", ""],
+		["System/types", "System/metadata/contracts", "System/metadata/"],
+	]) {
+		const resources = buildTaskNotesMdbaseResources({ typesFolder, contractsFolder });
+		assert.equal(resources.config.settings.types_folder, typesFolder);
+		assert.equal(resources.config.settings.contracts_folder, contractsFolder);
+		assert.equal(resources.paths.taskSchema, `${schemaParent}_schemas/tasknotes/tasknotes-task.schema.json`);
+		const pack = await buildTaskNotesMdbaseTypePack(resources);
+		assert.equal(pack.manifest.resources.find(({ source }) => source === "contracts/mdbase.app-settings/1.0.0.md").target, `${contractsFolder}/mdbase.app-settings/1.0.0.md`);
+		assert.equal(pack.manifest.resources.find(({ source }) => source === "schemas/mdbase.app-settings/1.0.0.schema.json").target, `${schemaParent}schemas/mdbase.app-settings/1.0.0.schema.json`);
+		const settingsType = pack.manifest.resources.find(({ source }) => source === "types/tasknotes-settings/2.md");
+		assert.equal(settingsType.target, `${typesFolder}/tasknotes-settings.md`);
+		assert.deepEqual(settingsType.upgrade_from.map(({ version }) => version), [1]);
+	}
+	const custom = buildTaskNotesMdbaseResources({ schemasFolder: "Custom/task-schemas" });
+	const pack = await buildTaskNotesMdbaseTypePack(custom);
+	assert.ok(pack.manifest.resources.some(({ target }) => target === "Custom/task-schemas/tasknotes-task.schema.json"));
 });
 
 test("round-trips optional NLP trigger settings through the TaskNotes contract", () => {

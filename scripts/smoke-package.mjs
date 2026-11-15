@@ -46,6 +46,9 @@ try {
   );
 
   for (const [filename, content] of [
+    ["settings.mjs", 'import { resolveAppSettingsPath as rootResolve } from "@tasknotes/model";\nimport { resolveAppSettingsPath, legacyAppSettingsPath, LEGACY_APP_SETTINGS_FOLDER } from "@tasknotes/model/settings";\nif (rootResolve("dev.tasknotes", { currentExists: false, legacyExists: true }) !== legacyAppSettingsPath("dev.tasknotes")) throw new Error("Root settings export failed");\nif (LEGACY_APP_SETTINGS_FOLDER !== "_settings" || resolveAppSettingsPath("dev.tasknotes", { currentExists: false, legacyExists: false }) !== "_mdbase/settings/dev.tasknotes.md") throw new Error("ESM settings exports failed");\n'],
+    ["settings.cjs", 'const { resolveAppSettingsPath } = require("@tasknotes/model/settings");\nconst { legacyAppSettingsPath } = require("@tasknotes/model");\nif (resolveAppSettingsPath("dev.tasknotes", { currentExists: false, legacyExists: true }) !== legacyAppSettingsPath("dev.tasknotes")) throw new Error("CJS settings exports failed");\n'],
+    ["settings.ts", 'import { resolveAppSettingsPath } from "@tasknotes/model";\nimport { appSettingsPath, legacyAppSettingsPath, resolveTaskNotesAppSettings } from "@tasknotes/model/settings";\nconst path: string = resolveAppSettingsPath("dev.tasknotes", { currentExists: true, legacyExists: true });\nresolveTaskNotesAppSettings(undefined, { path });\nvoid appSettingsPath;\nvoid legacyAppSettingsPath;\n'],
     ["calendar.mjs", 'import { buildCalendarEntries, createCalendarEntryIndex, planCalendarEdit } from "@tasknotes/model/calendar";\nimport { calendarFixtures } from "@tasknotes/model/calendar/fixtures";\nif (!planCalendarEdit || !createCalendarEntryIndex || buildCalendarEntries(calendarFixtures[0].input).length !== calendarFixtures[0].expectedEntries.length) throw new Error("ESM calendar exports failed");\n'],
     ["calendar.cjs", 'const { buildCalendarEntries } = require("@tasknotes/model/calendar");\nconst { calendarFixtures } = require("@tasknotes/model/calendar/fixtures");\nconst raw = [...require("@tasknotes/model/fixtures/calendar/scenarios.json"), ...require("@tasknotes/model/fixtures/calendar/moved-occurrences.json")];\nif (raw.length !== calendarFixtures.length || buildCalendarEntries(raw[0].input).length !== raw[0].expectedEntries.length) throw new Error("CJS calendar exports failed");\n'],
     ["calendar.ts", 'import { buildCalendarEntries, type CalendarEntry } from "@tasknotes/model/calendar";\nimport { calendarFixtures, type CalendarFixture } from "@tasknotes/model/calendar/fixtures";\nconst fixture: CalendarFixture = calendarFixtures[0];\nconst entries: CalendarEntry[] = buildCalendarEntries(fixture.input);\nvoid entries;\n'],
@@ -61,11 +64,16 @@ try {
   execFileSync(process.execPath, ["attachments.cjs"], { cwd: tempRoot, stdio: "inherit" });
   execFileSync(process.execPath, ["calendar.mjs"], { cwd: tempRoot, stdio: "inherit" });
   execFileSync(process.execPath, ["calendar.cjs"], { cwd: tempRoot, stdio: "inherit" });
+  execFileSync(process.execPath, ["settings.mjs"], { cwd: tempRoot, stdio: "inherit" });
+  execFileSync(process.execPath, ["settings.cjs"], { cwd: tempRoot, stdio: "inherit" });
   for (const resolution of ["nodenext", "node"]) {
     execFileSync(process.execPath, [resolve(packageRoot, "node_modules/typescript/bin/tsc"),
       "--noEmit", "--strict", "--target", "es2020", "--module", resolution === "nodenext" ? "nodenext" : "esnext",
       "--moduleResolution", resolution, "calendar.ts"], { cwd: tempRoot, stdio: "inherit" });
   }
+  execFileSync(process.execPath, [resolve(packageRoot, "node_modules/typescript/bin/tsc"),
+    "--noEmit", "--strict", "--target", "es2020", "--module", "esnext",
+    "--moduleResolution", "node", "settings.ts"], { cwd: tempRoot, stdio: "inherit" });
 } finally {
   if (tarball) rmSync(tarball, { force: true });
   rmSync(tempRoot, { recursive: true, force: true });

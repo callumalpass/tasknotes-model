@@ -1,12 +1,14 @@
 import YAML from "yaml";
+import tasknotesTypePack from "./generated/tasknotes-type-pack.json";
 import type { StatusConfig, TaskNotesModelConfig } from "./types";
 
 /*
- * App settings records (mdbase.app-settings 1.0.0): one record per app at
- * `_settings/<app>.md` whose flat frontmatter holds behaviour every client of
+ * App settings records (mdbase.app-settings 2.0.0): one record per app at
+ * `_mdbase/settings/<app>.md` (or `_settings/<app>.md` in older collections)
+ * whose flat frontmatter holds behaviour every client of
  * that app honours in the collection. The generic part below follows mdbase
  * Reader's implementation; the TaskNotes part defines the tasknotes.settings
- * 1.0.0 fields, which tasknotes.task 0.3.0-rc.6 moved out of the type binding.
+ * 1.1.0 fields, which tasknotes.task 0.3.0-rc.6 moved out of the type binding.
  *
  * - A missing record means defaults. Nothing here creates or repairs a record
  *   on read: an unusable field takes its default with a warning.
@@ -16,7 +18,8 @@ import type { StatusConfig, TaskNotesModelConfig } from "./types";
  */
 
 /** The folder collection-scope settings records live in. */
-export const APP_SETTINGS_FOLDER = "_settings";
+export const APP_SETTINGS_FOLDER = "_mdbase/settings";
+export const LEGACY_APP_SETTINGS_FOLDER = "_settings";
 
 export interface AppSettingField<Value> {
 	readonly default: Value;
@@ -60,6 +63,19 @@ export function appSettingsPath(app: string): string {
 	return `${APP_SETTINGS_FOLDER}/${app}.md`;
 }
 
+export function legacyAppSettingsPath(app: string): string {
+	return `${LEGACY_APP_SETTINGS_FOLDER}/${app}.md`;
+}
+
+export function resolveAppSettingsPath(
+	app: string,
+	exists: { currentExists: boolean; legacyExists: boolean }
+): string {
+	return !exists.currentExists && exists.legacyExists
+		? legacyAppSettingsPath(app)
+		: appSettingsPath(app);
+}
+
 export function defaultAppSettings<Values extends object>(
 	definition: AppSettingsDefinition<Values>
 ): ResolvedAppSettings<Values> {
@@ -74,7 +90,8 @@ export function defaultAppSettings<Values extends object>(
  */
 export function resolveAppSettings<Values extends object>(
 	definition: AppSettingsDefinition<Values>,
-	frontmatter: Readonly<Record<string, unknown>> | undefined
+	frontmatter: Readonly<Record<string, unknown>> | undefined,
+	path = appSettingsPath(definition.app)
 ): ResolvedAppSettings<Values> {
 	const values: Record<string, unknown> = {};
 	const stored: Record<string, unknown> = {};
@@ -92,7 +109,7 @@ export function resolveAppSettings<Values extends object>(
 			stored[key] = read;
 		}
 	}
-	const readOnly = frontmatter ? readOnlyReason(definition, frontmatter) : undefined;
+	const readOnly = frontmatter ? readOnlyReason(definition, frontmatter, path) : undefined;
 	return {
 		values: values as Values,
 		stored: stored as Partial<Values>,
@@ -208,9 +225,9 @@ export function readAppSettingsFrontmatter(markdown: string): Record<string, unk
 
 function readOnlyReason<Values extends object>(
 	definition: AppSettingsDefinition<Values>,
-	frontmatter: Readonly<Record<string, unknown>>
+	frontmatter: Readonly<Record<string, unknown>>,
+	path: string
 ): string | undefined {
-	const path = appSettingsPath(definition.app);
 	if (frontmatter.app !== undefined && frontmatter.app !== definition.app) {
 		return `${path} names another app, so it is left as it is.`;
 	}
@@ -225,17 +242,17 @@ function readOnlyReason<Values extends object>(
 }
 
 // ---------------------------------------------------------------------------
-// TaskNotes settings (tasknotes.settings 1.0.0)
+// TaskNotes settings (tasknotes.settings 1.1.0)
 
 export const TASKNOTES_SETTINGS_APP = "dev.tasknotes";
 export const TASKNOTES_SETTINGS_TYPE = "tasknotes-settings";
 export const TASKNOTES_SETTINGS_CONTRACT_ID = "tasknotes.settings";
-export const TASKNOTES_SETTINGS_CONTRACT_VERSION = "1.0.0";
+export const TASKNOTES_SETTINGS_CONTRACT_VERSION = "1.1.0";
 export const APP_SETTINGS_CONTRACT_ID = "mdbase.app-settings";
-export const APP_SETTINGS_CONTRACT_VERSION = "1.0.0";
+export const APP_SETTINGS_CONTRACT_VERSION = "2.0.0";
 export const TASKNOTES_SETTINGS_VERSION = 1;
 /** Version of the generated tasknotes-settings type. */
-export const TASKNOTES_SETTINGS_TYPE_VERSION = 1;
+export const TASKNOTES_SETTINGS_TYPE_VERSION = 2;
 export const TASKNOTES_SETTINGS_PATH = appSettingsPath(TASKNOTES_SETTINGS_APP);
 /** Default auto-archive delay, in minutes, for a status without one. */
 export const TASKNOTES_DEFAULT_AUTO_ARCHIVE_DELAY = 5;
@@ -474,9 +491,13 @@ export interface ResolvedTaskNotesAppSettings extends ResolvedAppSettings<TaskNo
  */
 export function resolveTaskNotesAppSettings(
 	frontmatter: Readonly<Record<string, unknown>> | undefined,
-	options: { legacyBinding?: unknown; fallback?: Partial<TaskNotesAppSettingsValues> } = {}
+	options: {
+		legacyBinding?: unknown;
+		fallback?: Partial<TaskNotesAppSettingsValues>;
+		path?: string;
+	} = {}
 ): ResolvedTaskNotesAppSettings {
-	const resolved = resolveAppSettings(tasknotesSettingsDefinition, frontmatter);
+	const resolved = resolveAppSettings(tasknotesSettingsDefinition, frontmatter, options.path);
 	const legacy = taskNotesAppSettingsFromLegacyBinding(options.legacyBinding);
 	const fallback = options.fallback ?? {};
 	const values = { ...resolved.values } as Record<string, unknown>;
@@ -742,7 +763,7 @@ export interface TaskNotesSettingsResources {
 	type: Record<string, unknown>;
 	typeDocument: string;
 	paths: {
-		/** Pack source and target of the contract, schema and type. */
+		/** Resolved resource paths; the inline schema needs no standalone file. */
 		contract: string;
 		schema: string;
 		type: string;
@@ -758,106 +779,33 @@ export interface TaskNotesSettingsResources {
 export function buildTaskNotesSettingsResources(
 	options: { typesFolder?: string; contractsFolder?: string } = {}
 ): TaskNotesSettingsResources {
-	const typesFolder = options.typesFolder ?? "_types";
-	const contractsFolder = options.contractsFolder ?? "_contracts";
+	const typesFolder = options.typesFolder ?? "_mdbase/types";
+	const contractsFolder = options.contractsFolder ?? "_mdbase/contracts";
+	const schemasFolder = [...contractsFolder.split("/").slice(0, -1), "schemas"].join("/");
 	const version = TASKNOTES_SETTINGS_CONTRACT_VERSION;
-	const contract = {
-		kind: "mdbase.contract",
-		contract_type: "record",
-		id: TASKNOTES_SETTINGS_CONTRACT_ID,
-		version,
-		name: "TaskNotes settings",
-		description: "Collection-wide TaskNotes behaviour, such as templates, archive moves and status cycling.",
-		record_schema: {
-			dialect: "json-schema-2020-12",
-			ref: `../../schemas/${TASKNOTES_SETTINGS_CONTRACT_ID}/${version}.schema.json`,
-		},
-	};
-	const contractDocument = [
-		"---",
-		YAML.stringify(contract, { lineWidth: 0 }).trimEnd(),
-		"---",
-		"",
-		"# TaskNotes settings",
-		"",
-		`The collection's settings record for TaskNotes, at \`${TASKNOTES_SETTINGS_PATH}\`.`,
-		"It also implements `mdbase.app-settings`, whose reserved fields (`app`, `scope`,",
-		"`settings_version`) it shares.",
-		"",
-		"These settings change what TaskNotes clients do, never what a task record",
-		"means: that stays in the `tasknotes.task` binding of each task type.",
-		"`tasknotes.task` 0.3.0-rc.6 moved them here from the binding. A client reads",
-		"each setting from this record, then from an earlier binding that still holds",
-		"it, then uses its default, so a collection whose task type is still on rc.5",
-		"keeps its behaviour until it is upgraded.",
-		"",
-		"## Fields",
-		"",
-		"- `nlp_triggers`: natural-language capture triggers. Without it, each client",
-		"  uses its own defaults.",
-		"- `template_enabled`, `template_path`, `occurrence_template_enabled`,",
-		"  `occurrence_template_path`, `template_failure_mode`,",
-		"  `template_unknown_variable_policy`: body templates for new tasks and",
-		"  materialized occurrences.",
-		"- `move_on_archive`, `archive_folder`: whether archiving moves the file, and",
-		"  where to.",
-		"- `auto_stop_time_tracking_on_complete`: stop a running timer on completion.",
-		"- `reset_body_checkboxes_on_recurrence`: uncheck body checkboxes when a",
-		"  recurring task advances.",
-		"- `link_write_format`: `wikilink` or `markdown` for links written to task",
-		"  frontmatter.",
-		"- `status_behavior`: per status value, `next_status`, `exclude_from_cycle`,",
-		"  `auto_archive` and `auto_archive_delay_minutes`. A status without an entry",
-		"  has no next status and no auto-archive (5 minute delay), and is out of the",
-		"  cycle exactly when it is a skipped status.",
-		"",
-		"## Authority",
-		"",
-		"This artifact is passive and grants nothing.",
-		"",
-	].join("\n");
-	const reserved = { app: "app", scope: "scope", settings_version: "settings_version" };
-	const type = {
-		kind: "mdbase.type",
-		name: TASKNOTES_SETTINGS_TYPE,
-		version: TASKNOTES_SETTINGS_TYPE_VERSION,
-		description: `TaskNotes' collection-wide settings, one record at ${TASKNOTES_SETTINGS_PATH}.`,
-		match: { where: { app: { eq: TASKNOTES_SETTINGS_APP } } },
-		schema: { dialect: "json-schema-2020-12", value: cloneValue(TASKNOTES_SETTINGS_SCHEMA) },
-		collection: { unique: [{ field: "app", scope: "type" }] },
-		implements: [
-			{ contract: APP_SETTINGS_CONTRACT_ID, version: APP_SETTINGS_CONTRACT_VERSION, fields: { ...reserved } },
-			{
-				contract: TASKNOTES_SETTINGS_CONTRACT_ID,
-				version,
-				fields: {
-					...reserved,
-					...Object.fromEntries(TASKNOTES_APP_SETTING_KEYS.map((key) => [key, key])),
-				},
-			},
-		],
-	};
-	const typeDocument = [
-		"---",
-		YAML.stringify(type, { lineWidth: 0 }).trimEnd(),
-		"---",
-		"",
-		"# TaskNotes settings",
-		"",
-		"Settings that every TaskNotes client honours in this collection, such as body",
-		"templates, archive moves and status cycling. TaskNotes reads them from",
-		`\`${TASKNOTES_SETTINGS_PATH}\` and writes only the fields a save changes.`,
-		"",
-	].join("\n");
+	const contractDocument = tasknotesTypePack.resources.find(
+		(resource) => resource.source === `contracts/${TASKNOTES_SETTINGS_CONTRACT_ID}/${version}.md`
+	)?.document;
+	const typeDocument = tasknotesTypePack.resources.find(
+		(resource) => resource.source === `types/${TASKNOTES_SETTINGS_TYPE}/${TASKNOTES_SETTINGS_TYPE_VERSION}.md`
+	)?.document;
+	if (!contractDocument || !typeDocument) {
+		throw new Error("The published TaskNotes pack is missing its settings resources.");
+	}
+	const contract = readAppSettingsFrontmatter(contractDocument);
+	const type = readAppSettingsFrontmatter(typeDocument);
+	if (!contract || !type || !isRecord(contract.record_schema)) {
+		throw new Error("The published TaskNotes settings resources have no frontmatter.");
+	}
 	return {
 		contract,
 		contractDocument,
-		schemaDocument: `${JSON.stringify(TASKNOTES_SETTINGS_SCHEMA, null, 2)}\n`,
+		schemaDocument: `${JSON.stringify(contract.record_schema.value, null, 2)}\n`,
 		type,
 		typeDocument,
 		paths: {
 			contract: `${contractsFolder}/${TASKNOTES_SETTINGS_CONTRACT_ID}/${version}.md`,
-			schema: `schemas/${TASKNOTES_SETTINGS_CONTRACT_ID}/${version}.schema.json`,
+			schema: `${schemasFolder}/${TASKNOTES_SETTINGS_CONTRACT_ID}/${version}.schema.json`,
 			type: `${typesFolder}/${TASKNOTES_SETTINGS_TYPE}.md`,
 			record: TASKNOTES_SETTINGS_PATH,
 		},
