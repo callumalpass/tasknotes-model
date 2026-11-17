@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `FieldMapping.id` names the stable task identity property. It defaults to `id`; mappings saved without it keep using `id`. `mapTaskFromFrontmatter` reads the ID from the mapped property, `toUserField`, `lookupMappingKey` and `validateFieldMapping` include it, and `DEFAULT_ID_PROPERTY` is exported from `@tasknotes/model/mapping`.
+- `buildTaskNotesMdbaseResources` uses the mapped ID property for the type's `implements[].fields.id`, schema property, `on_create` UUID, uniqueness rule and the collection's `id_field`. `resolveTaskNotesModelConfigFromMdbaseType` reads a type's `fields.id` into the mapping, and with a remapped ID a plain `id` property resolves as a custom field.
+
 ## 0.3.0 - 2026-11-15
 
 Promotes the package to stable semver, retaining the tasknotes-spec 0.3.0

@@ -109,6 +109,11 @@ export type TaskUpdateInput = Partial<TaskInfo> & {
 };
 
 export interface FieldMapping {
+	/**
+	 * The stable task identity property. Optional for mappings saved before
+	 * this field existed; those use `id`.
+	 */
+	id?: string;
 	title: string;
 	status: string;
 	priority: string;
