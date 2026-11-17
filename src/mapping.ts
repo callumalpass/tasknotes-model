@@ -24,10 +24,14 @@ export const VALID_DEPENDENCY_RELTYPES: TaskDependencyRelType[] = [
 ];
 
 export const DEFAULT_RECURRENCE_ORIGINAL_DATE_PROPERTY = "recurrence_original_date";
+export const DEFAULT_ID_PROPERTY = "id";
 
-function withResolvedMapping(mapping: FieldMapping): FieldMapping & { recurrenceOriginalDate: string } {
+type ResolvedFieldMapping = FieldMapping & { id: string; recurrenceOriginalDate: string };
+
+function withResolvedMapping(mapping: FieldMapping): ResolvedFieldMapping {
 	return {
 		...mapping,
+		id: toUserField(mapping, "id"),
 		recurrenceOriginalDate: toUserField(mapping, "recurrenceOriginalDate"),
 	};
 }
@@ -45,6 +49,11 @@ export function normalizeRecurrenceOriginalDate(value: unknown): string | undefi
 }
 
 export function toUserField(mapping: FieldMapping, internalName: FieldMappingKey): string {
+	if (internalName === "id") {
+		return typeof mapping.id === "string" && mapping.id.trim().length > 0
+			? mapping.id
+			: DEFAULT_ID_PROPERTY;
+	}
 	if (internalName === "recurrenceOriginalDate") {
 		return typeof mapping.recurrenceOriginalDate === "string"
 			? mapping.recurrenceOriginalDate
@@ -120,8 +129,9 @@ export function mapTaskFromFrontmatter(
 	const mapped: Partial<TaskInfo> = {
 		path: filePath,
 	};
-	if (typeof frontmatter.id === "string" && frontmatter.id.trim().length > 0) {
-		mapped.id = frontmatter.id;
+	const id = frontmatter[toUserField(mapping, "id")];
+	if (typeof id === "string" && id.trim().length > 0) {
+		mapped.id = id;
 	}
 
 	if (frontmatter[mapping.title] !== undefined) {

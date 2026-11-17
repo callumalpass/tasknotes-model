@@ -1,6 +1,7 @@
 import YAML from "yaml";
 import tasknotesTypePack from "./generated/tasknotes-type-pack.json";
 import { resolveModelConfig } from "./config";
+import { toUserField } from "./mapping";
 import {
 	TASKNOTES_TASK_BINDING_SCHEMA,
 	TASKNOTES_TASK_COMPLETED_EVENT_SCHEMA,
@@ -550,6 +551,7 @@ export function buildTaskNotesMdbaseResources(
 		options.capabilities ?? DEFAULT_TASKNOTES_MDBASE_CAPABILITIES
 	);
 	const legacyCompatibility = options.legacyCompatibility === true;
+	const idField = toUserField(modelConfig.fieldMapping, "id");
 	const statusValues = uniqueStrings(modelConfig.statuses.map((status) => status.value));
 	const priorityValues = uniqueStrings(modelConfig.priorities.map((priority) => priority.value));
 	const completedValues = uniqueStrings(
@@ -576,7 +578,7 @@ export function buildTaskNotesMdbaseResources(
 			record_extensions: ["md"],
 			validation: options.collection?.validation ?? "warn",
 			explicit_type_keys: ["type", "types"],
-			id_field: "id",
+			id_field: idField,
 			...(excludes.length > 0 ? { exclude: excludes } : {}),
 		},
 	};
@@ -640,7 +642,7 @@ export function buildTaskNotesMdbaseResources(
 	};
 
 	if (options.stableId !== false) {
-		addField("id", "id", stringSchema({ minLength: 1 }, legacyCompatibility), {
+		addField("id", idField, stringSchema({ minLength: 1 }, legacyCompatibility), {
 			createValue: { uuid: true },
 		});
 	}
@@ -812,7 +814,7 @@ export function buildTaskNotesMdbaseResources(
 		omittedCollectionPaths.add(titleField);
 	}
 	if (options.stableId !== false) {
-		collection.unique = [{ field: "id", scope: "type" }];
+		collection.unique = [{ field: idField, scope: "type" }];
 	}
 
 	const filenameFormat =
@@ -1529,7 +1531,11 @@ function resolveUserFields(
 	fieldMapping: FieldMapping,
 	fallback: UserMappedField[]
 ): UserMappedField[] {
-	const reserved = new Set([...Object.values(fieldMapping), "id", "tags"]);
+	const reserved = new Set([
+		...Object.values(fieldMapping),
+		toUserField(fieldMapping, "id"),
+		"tags",
+	]);
 	const resolved: UserMappedField[] = [];
 
 	for (const [key, schema] of Object.entries(schemaProperties)) {

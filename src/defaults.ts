@@ -6,6 +6,7 @@ import type {
 } from "./types";
 
 export const DEFAULT_FIELD_MAPPING: FieldMapping = {
+	id: "id",
 	title: "title",
 	status: "status",
 	priority: "priority",
