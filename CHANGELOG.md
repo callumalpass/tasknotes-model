@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Editing a completion-anchored recurrence rule no longer moves the current occurrence's scheduled or due date.
+
 ## 0.3.1 - 2026-11-18
 
 ### Added
