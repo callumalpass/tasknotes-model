@@ -306,13 +306,16 @@ export function buildTaskUpdateRecurrenceUpdates({
 
 	if (updates.recurrence !== undefined && updates.recurrence !== originalTask.recurrence) {
 		const tempTask: TaskInfo = { ...originalTask, ...updates };
-		const nextDates = updateToNextScheduledOccurrence(tempTask, maintainDueDateOffsetInRecurring);
-		if (nextDates.scheduled) recurrenceUpdates.scheduled = nextDates.scheduled;
-		if (nextDates.due) recurrenceUpdates.due = nextDates.due;
+		const keepCurrentOccurrence =
+			originalTask.recurrence && tempTask.scheduled && tempTask.recurrence_anchor === "completion";
+		if (!keepCurrentOccurrence) {
+			const nextDates = updateToNextScheduledOccurrence(tempTask, maintainDueDateOffsetInRecurring);
+			if (nextDates.scheduled) recurrenceUpdates.scheduled = nextDates.scheduled;
+			if (nextDates.due) recurrenceUpdates.due = nextDates.due;
+		}
 		if (typeof updates.recurrence === "string" && updates.recurrence && !updates.recurrence.includes("DTSTART:")) {
 			const updatedRecurrence = addDTSTARTToRecurrenceRule({
-				...originalTask,
-				...updates,
+				...tempTask,
 				...recurrenceUpdates,
 			});
 			if (updatedRecurrence) recurrenceUpdates.recurrence = updatedRecurrence;
