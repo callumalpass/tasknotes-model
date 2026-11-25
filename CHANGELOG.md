@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Generated mdbase task types accept floating scheduled and due times written by TaskNotes. Thanks to @iantierney for reporting (TaskNotes #2706).
+
 ## 0.3.2 - 2026-11-20
 
 ### Fixed

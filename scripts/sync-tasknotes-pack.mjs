@@ -9,7 +9,7 @@ const generatedPath = path.resolve(
 	"../src/generated/tasknotes-type-pack.json"
 );
 const source = await readFile(
-	path.join(contractsRoot, "dist/packs/tasknotes.task/0.3.0-rc.21.json"),
+	path.join(contractsRoot, "dist/packs/tasknotes.task/0.3.0-rc.22.json"),
 	"utf8"
 );
 

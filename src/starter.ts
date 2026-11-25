@@ -28,7 +28,7 @@ export const TASKNOTES_STARTER_TYPE_VERSION = TASKNOTES_MDBASE_TYPE_VERSION;
  * type's data keeps TASKNOTES_STARTER_TYPE_VERSION, so collections that already
  * have that version do not see a conflicting version change on upgrade.
  */
-export const TASKNOTES_STARTER_REVISION = 6;
+export const TASKNOTES_STARTER_REVISION = 7;
 
 /**
  * The generator bookkeeping published in the first starter. Collections keep
@@ -143,14 +143,8 @@ export function buildTaskNotesStarterResources(
 		managed_fields: [...TASKNOTES_STARTER_MANAGED_FIELDS],
 	};
 	// One shared date schema, so due and scheduled cannot drift apart.
-	const taskDateSchema = {
-		anyOf: [
-			{ type: "string", format: "date" },
-			{ type: "string", format: "date-time" },
-		],
-	};
-	type.schema.value.properties[implementation.fields.due] = taskDateSchema;
-	type.schema.value.properties[implementation.fields.scheduled] = taskDateSchema;
+	const properties = type.schema.value.properties;
+	properties[implementation.fields.scheduled] = properties[implementation.fields.due];
 	implementation.binding.status = {
 		...implementation.binding.status,
 		skipped_values: ["cancelled"],
