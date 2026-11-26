@@ -751,24 +751,14 @@
         },
         "expectedUpdates": {
           "scheduled": "2026-03-07T11:00",
-          "complete_instances": [],
-          "skipped_instances": [],
-          "dateModified": "2026-03-08T16:00:00Z",
-          "recurrence_original_date": "2026-03-08"
+          "recurrence_original_date": "2026-03-08",
+          "dateModified": "2026-03-08T16:00:00Z"
         },
         "expectedFrontmatterPatch": [
           {
             "op": "set",
             "field": "scheduled",
             "value": "2026-03-07T11:00"
-          },
-          {
-            "op": "delete",
-            "field": "complete_instances"
-          },
-          {
-            "op": "delete",
-            "field": "skipped_instances"
           },
           {
             "op": "set",
@@ -782,12 +772,8 @@
           }
         ],
         "expectedClearedInstances": {
-          "complete": [
-            "2026-03-07"
-          ],
-          "skipped": [
-            "2026-03-09"
-          ]
+          "complete": [],
+          "skipped": []
         }
       },
       {
