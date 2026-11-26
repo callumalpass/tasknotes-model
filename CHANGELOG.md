@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- `planCalendarEdit` no longer clears other occurrences' completed or skipped history when moving a scheduled-anchored recurring task. Moves without a `recurrence_original_date` (such as Google-synced or legacy off-pattern tasks) clear only the landing day when it is already recorded; completion-anchored tasks keep clearing recorded instances on or after the new date. Thanks to @martin-forge for reporting (TaskNotes #2691).
 - Generated mdbase task types accept floating scheduled and due times written by TaskNotes. Thanks to @iantierney for reporting (TaskNotes #2706).
 
 ## 0.3.2 - 2026-11-20

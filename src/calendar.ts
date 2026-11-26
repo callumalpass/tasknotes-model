@@ -601,21 +601,6 @@ export function planCalendarEdit({
 				? `${dayOf(task.scheduled || entry.start)}${value.slice(10)}`
 				: value;
 	}
-	if (
-		entry.type !== "scheduledToDueSpan" &&
-		updates.scheduled &&
-		task.recurrence &&
-		task.scheduled &&
-		dayOf(updates.scheduled) !== dayOf(task.scheduled)
-	) {
-		const day = calendarDay(updates.scheduled);
-		clearedInstances.complete = (task.complete_instances || []).filter((date) => date >= day);
-		clearedInstances.skipped = (task.skipped_instances || []).filter((date) => date >= day);
-		if (clearedInstances.complete.length || clearedInstances.skipped.length) {
-			updates.complete_instances = (task.complete_instances || []).filter((date) => date < day);
-			updates.skipped_instances = (task.skipped_instances || []).filter((date) => date < day);
-		}
-	}
 	// Mirror the plugin's recurring-provider exception bookkeeping, without provider IO.
 	const tracksException =
 		!!task.recurrence &&
@@ -640,6 +625,7 @@ export function planCalendarEdit({
 	}
 	// A calendar move changes the pending placement, not the native rule identity.
 	// Freeze DTSTART against the old cursor before it can become the new seed.
+	let hasMoveIdentity = false;
 	if (updates.scheduled && updates.scheduled !== task.scheduled && task.recurrence) {
 		const originalCivilTask = {
 			...task,
@@ -673,6 +659,7 @@ export function planCalendarEdit({
 					if (occurrences.some((date) => date.toISOString().slice(0, 10) === previous))
 						original = previous;
 				}
+				hasMoveIdentity = Boolean(original);
 				if (task.recurrence_original_date || original) {
 					updates.recurrence_original_date = original && next !== original ? original : undefined;
 				}
@@ -687,6 +674,38 @@ export function planCalendarEdit({
 	) {
 		// Pattern/DTSTART edits establish a new series contract.
 		updates.recurrence_original_date = undefined;
+	}
+	// Completion-anchored moves re-anchor the timeline and clear recorded instances
+	// on or after the new day. Scheduled-anchored moves keep occurrence history
+	// intact when the moved occurrence retains a rule identity; only unmarked
+	// occurrences (such as Google-synced or legacy off-pattern notes) clear a
+	// recorded landing day.
+	if (
+		entry.type !== "scheduledToDueSpan" &&
+		updates.scheduled &&
+		task.recurrence &&
+		task.scheduled &&
+		dayOf(updates.scheduled) !== dayOf(task.scheduled)
+	) {
+		const day = calendarDay(updates.scheduled);
+		const isCompletionAnchored = (task.recurrence_anchor || "scheduled") === "completion";
+		const shouldClear = isCompletionAnchored
+			? (date: string) => date >= day
+			: !hasMoveIdentity
+				? (date: string) => date === day
+				: null;
+		if (shouldClear) {
+			clearedInstances.complete = (task.complete_instances || []).filter(shouldClear);
+			clearedInstances.skipped = (task.skipped_instances || []).filter(shouldClear);
+			if (clearedInstances.complete.length || clearedInstances.skipped.length) {
+				updates.complete_instances = (task.complete_instances || []).filter(
+					(date) => !shouldClear(date),
+				);
+				updates.skipped_instances = (task.skipped_instances || []).filter(
+					(date) => !shouldClear(date),
+				);
+			}
+		}
 	}
 	updates.dateModified = now;
 	return {
