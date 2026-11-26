@@ -77,8 +77,12 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 			{ type: "string", format: "date-time" },
 		],
 	};
-	assert.deepEqual(schema.properties.due, taskDateSchema);
-	assert.deepEqual(schema.properties.scheduled, taskDateSchema);
+	assert.deepEqual(schema.properties.due, schema.properties.scheduled);
+	assert.deepEqual(schema.properties.due.anyOf.slice(0, 2), taskDateSchema.anyOf);
+	const localTime = new RegExp(schema.properties.due.anyOf[2].pattern);
+	assert.match("2026-11-30T16:00", localTime);
+	assert.match("2026-11-30T16:00:59", localTime);
+	assert.doesNotMatch("2026-11-30T25:00", localTime);
 	assert.deepEqual(resources.taskSchema.properties.due, taskDateSchema);
 	assert.deepEqual(resources.taskSchema.properties.scheduled, taskDateSchema);
 	assert.deepEqual(type.collection.unique, [{ field: "id", scope: "type" }]);
@@ -136,11 +140,11 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	assert.equal(pack.manifest.kind, "mdbase.type-pack");
 	assert.equal(pack.manifest.id, "tasknotes.task");
 	assert.equal(pack.manifest.version, TASKNOTES_MDBASE_PACK_VERSION);
-	assert.equal(TASKNOTES_MDBASE_PACK_VERSION, "0.3.0-rc.21");
+	assert.equal(TASKNOTES_MDBASE_PACK_VERSION, "0.3.0-rc.22");
 	assert.equal(pack.manifest.resources.length, 14);
 	assert.deepEqual(
 		pack.manifest.resources.filter(({ source }) => [
-			"contracts/tasknotes.task/0.3.0-rc.6.md", "types/tasknotes-task/6.md",
+			"contracts/tasknotes.task/0.3.0-rc.6.md", "types/tasknotes-task/7.md",
 			"schemas/tasknotes.task/0.3.0-rc.6.schema.json", "schemas/tasknotes.task.binding/0.3.0-rc.6.schema.json",
 		].includes(source)).map(({ kind, mode, target }) => [kind, mode, target]),
 		[

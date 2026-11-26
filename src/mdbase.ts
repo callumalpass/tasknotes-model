@@ -185,7 +185,7 @@ export interface TaskNotesMdbaseTypePack {
 export const TASKNOTES_MDBASE_TYPE_VERSION = 5;
 
 /** Version of the generated definition bundle, independent of contract version. */
-export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.21";
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.22";
 export const TASKNOTES_CONTRACT_DIGEST =
 	"sha256:c400ead6e218b715d86ad31125bb3d4b2e276817da6ba8065449fd0947b24d67";
 
@@ -1039,7 +1039,7 @@ export async function buildTaskNotesMdbaseTypePack(
 		[`contracts/tasknotes.task/${TASKNOTES_SPEC_VERSION}.md`, {
 			target: resources.paths.contract, document: resources.contractDocument,
 		}],
-		["types/tasknotes-task/6.md", {
+		["types/tasknotes-task/7.md", {
 			target: resources.paths.type, document: resources.typeDocument,
 		}],
 		[`schemas/tasknotes.task/${TASKNOTES_SPEC_VERSION}.schema.json`, {
@@ -1741,6 +1741,11 @@ function taskDateSchema(legacyCompatibility: boolean): Record<string, unknown> {
 		anyOf: [
 			dateSchema(legacyCompatibility),
 			dateTimeSchema(legacyCompatibility),
+			{
+				type: "string",
+				// TaskNotes also stores wall-clock times without a UTC offset.
+				pattern: "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$",
+			},
 		],
 	};
 }
