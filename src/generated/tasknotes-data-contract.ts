@@ -5,7 +5,7 @@ export const TASKNOTES_TASK_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task.schema.json",
 	"title": "TaskNotes portable task view",
-	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.6 record contract.",
+	"description": "The storage-neutral record view exposed by the tasknotes.task 0.3.0-rc.7 record contract.",
 	"type": "object",
 	"required": [
 		"status",
@@ -38,6 +38,10 @@ export const TASKNOTES_TASK_SCHEMA = {
 				{
 					"type": "string",
 					"format": "date-time"
+				},
+				{
+					"type": "string",
+					"format": "local-date-time"
 				}
 			]
 		},
@@ -50,6 +54,10 @@ export const TASKNOTES_TASK_SCHEMA = {
 				{
 					"type": "string",
 					"format": "date-time"
+				},
+				{
+					"type": "string",
+					"format": "local-date-time"
 				}
 			]
 		},
@@ -92,12 +100,28 @@ export const TASKNOTES_TASK_SCHEMA = {
 			"format": "date"
 		},
 		"dateCreated": {
-			"type": "string",
-			"format": "date-time"
+			"anyOf": [
+				{
+					"type": "string",
+					"format": "date-time"
+				},
+				{
+					"type": "string",
+					"format": "local-date-time"
+				}
+			]
 		},
 		"dateModified": {
-			"type": "string",
-			"format": "date-time"
+			"anyOf": [
+				{
+					"type": "string",
+					"format": "date-time"
+				},
+				{
+					"type": "string",
+					"format": "local-date-time"
+				}
+			]
 		},
 		"recurrence": {
 			"type": "string"
@@ -208,7 +232,7 @@ export const TASKNOTES_TASK_BINDING_SCHEMA = {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://tasknotes.dev/schemas/tasknotes-task-binding.schema.json",
 	"title": "TaskNotes task data-contract binding",
-	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.6. App behaviour, such as templates, archive moves, status cycling and natural-language triggers, lives in the app's tasknotes.settings record instead.",
+	"description": "Semantic configuration supplied by an mdbase type that implements tasknotes.task 0.3.0-rc.7. App behaviour, such as templates, archive moves, status cycling and natural-language triggers, lives in the app's tasknotes.settings record instead.",
 	"type": "object",
 	"required": [
 		"profiles",

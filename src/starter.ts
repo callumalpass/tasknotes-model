@@ -11,7 +11,7 @@ import { TASKNOTES_SPEC_VERSION, type TaskNotesModelConfig } from "./types";
 /**
  * The published TaskNotes starter: the `tasknotes.task` pack's seed type that
  * applications install into new collections (mdbase-contracts
- * `types/tasknotes-task/<TASKNOTES_STARTER_TYPE_VERSION>.md`).
+ * `types/tasknotes-task/<TASKNOTES_STARTER_REVISION>.md`).
  *
  * It differs from the plugin defaults in `DEFAULT_STATUSES`: it adds the
  * skipped `cancelled` status, uses its own palette and declares only the
@@ -28,7 +28,7 @@ export const TASKNOTES_STARTER_TYPE_VERSION = TASKNOTES_MDBASE_TYPE_VERSION;
  * type's data keeps TASKNOTES_STARTER_TYPE_VERSION, so collections that already
  * have that version do not see a conflicting version change on upgrade.
  */
-export const TASKNOTES_STARTER_REVISION = 7;
+export const TASKNOTES_STARTER_REVISION = 8;
 
 /**
  * The generator bookkeeping published in the first starter. Collections keep

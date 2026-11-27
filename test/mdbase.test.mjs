@@ -7,13 +7,16 @@ import {
 	buildTaskNotesMdbaseTypePack,
 	patchTaskNotesMdbaseTypeSettings,
 	resolveTaskNotesModelConfigFromMdbaseType,
+	TASKNOTES_LEGACY_CONTRACT_DIGESTS,
+	TASKNOTES_LEGACY_CONTRACT_VERSIONS,
 	TASKNOTES_MDBASE_PACK_VERSION,
+	TASKNOTES_MDBASE_TYPE_VERSION,
 } from "../dist/esm/mdbase.js";
 
 function implementation(type) {
 	return type.implements.find(
 		(entry) =>
-			entry.contract === "tasknotes.task" && entry.version === "0.3.0-rc.6"
+			entry.contract === "tasknotes.task" && entry.version === "0.3.0-rc.7"
 	);
 }
 
@@ -31,15 +34,17 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	assert.equal(resources.config.spec_version, "0.3.0");
 	assert.equal(resources.config.settings.types_folder, "_mdbase/types");
 	assert.equal(resources.config.settings.contracts_folder, "_mdbase/contracts");
-	assert.equal(resources.paths.contract, "_mdbase/contracts/tasknotes.task/0.3.0-rc.6.md");
+	assert.equal(resources.paths.contract, "_mdbase/contracts/tasknotes.task/0.3.0-rc.7.md");
 	assert.equal(resources.paths.type, "_mdbase/types/task.md");
 	assert.equal(resources.paths.taskSchema, "_mdbase/_schemas/tasknotes/tasknotes-task.schema.json");
 	assert.equal(resources.contract.id, "tasknotes.task");
 	assert.equal(resources.contract.contract_type, "record");
-	assert.equal(resources.contract.version, "0.3.0-rc.6");
+	assert.equal(resources.contract.version, "0.3.0-rc.7");
 	assert.ok(resources.contract.record_schema);
 	assert.equal(taskImplementation.contract, "tasknotes.task");
-	assert.equal(taskImplementation.version, "0.3.0-rc.6");
+	assert.equal(taskImplementation.version, "0.3.0-rc.7");
+	assert.equal(type.version, TASKNOTES_MDBASE_TYPE_VERSION);
+	assert.equal(TASKNOTES_MDBASE_TYPE_VERSION, 6);
 	assert.deepEqual(extension.profiles, [
 		"core-lite",
 		"recurrence",
@@ -71,24 +76,22 @@ test("builds one canonical TaskNotes and mdbase collection contract", () => {
 	assert.deepEqual(type.collection.links["attachments[]"], {
 		validate_exists: false,
 	});
-	const taskDateSchema = {
-		anyOf: [
-			{ type: "string", format: "date" },
-			{ type: "string", format: "date-time" },
-		],
-	};
-	assert.deepEqual(schema.properties.due, schema.properties.scheduled);
-	assert.deepEqual(schema.properties.due.anyOf.slice(0, 2), taskDateSchema.anyOf);
-	const localTime = new RegExp(schema.properties.due.anyOf[2].pattern);
-	assert.match("2026-11-30T16:00", localTime);
-	assert.match("2026-11-30T16:00:59", localTime);
-	assert.doesNotMatch("2026-11-30T25:00", localTime);
-	assert.deepEqual(resources.taskSchema.properties.due, taskDateSchema);
-	assert.deepEqual(resources.taskSchema.properties.scheduled, taskDateSchema);
+	const instant = { type: "string", format: "date-time" };
+	const floating = { type: "string", format: "local-date-time" };
+	const taskDateSchema = { anyOf: [{ type: "string", format: "date" }, instant, floating] };
+	const taskTimestampSchema = { anyOf: [instant, floating] };
+	for (const { properties } of [schema, resources.taskSchema]) {
+		assert.deepEqual(properties.due, taskDateSchema);
+		assert.deepEqual(properties.scheduled, taskDateSchema);
+		assert.deepEqual(properties.dateCreated, taskTimestampSchema);
+		assert.deepEqual(properties.dateModified, taskTimestampSchema);
+	}
+	assert.deepEqual(schema.properties.timeEntries.items.properties.startTime, instant);
+	assert.deepEqual(schema.properties.timeEntries.items.properties.endTime, instant);
+	assert.deepEqual(schema.properties.reminders.items.oneOf[0].properties.absoluteTime, instant);
 	assert.deepEqual(type.collection.unique, [{ field: "id", scope: "type" }]);
 	assert.deepEqual(type.lifecycle.on_create.set.id, { uuid: true });
 	assert.deepEqual(schema.properties.completedDate, { type: "string", format: "date" });
-	assert.deepEqual(schema.properties.dateModified, { type: "string", format: "date-time" });
 	assert.deepEqual(YAML.parse(resources.configDocument), resources.config);
 	assert.deepEqual(JSON.parse(resources.taskSchemaDocument), resources.taskSchema);
 	assert.deepEqual(
@@ -132,7 +135,7 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	const pack = await buildTaskNotesMdbaseTypePack(resources);
 
 	assert.deepEqual(pack.provides.map(({ id, version }) => [id, version]), [
-		["tasknotes.task", "0.3.0-rc.6"],
+		["tasknotes.task", "0.3.0-rc.7"],
 		["tasknotes.settings", "1.1.0"],
 		["mdbase.app-settings", "2.0.0"],
 	]);
@@ -140,15 +143,18 @@ test("packages the contract, implementation, and schemas as one digest-pinned ty
 	assert.equal(pack.manifest.kind, "mdbase.type-pack");
 	assert.equal(pack.manifest.id, "tasknotes.task");
 	assert.equal(pack.manifest.version, TASKNOTES_MDBASE_PACK_VERSION);
-	assert.equal(TASKNOTES_MDBASE_PACK_VERSION, "0.3.0-rc.22");
-	assert.equal(pack.manifest.resources.length, 14);
+	assert.equal(TASKNOTES_MDBASE_PACK_VERSION, "0.3.0-rc.23");
+	assert.equal(pack.manifest.resources.length, 15);
+	assert.ok(TASKNOTES_LEGACY_CONTRACT_VERSIONS.includes("0.3.0-rc.6"));
+	assert.equal(TASKNOTES_LEGACY_CONTRACT_DIGESTS["0.3.0-rc.6"], "sha256:c400ead6e218b715d86ad31125bb3d4b2e276817da6ba8065449fd0947b24d67");
+	assert.ok(pack.manifest.resources.some(({ source }) => source === "contracts/tasknotes.task/0.3.0-rc.6.md"));
 	assert.deepEqual(
 		pack.manifest.resources.filter(({ source }) => [
-			"contracts/tasknotes.task/0.3.0-rc.6.md", "types/tasknotes-task/7.md",
-			"schemas/tasknotes.task/0.3.0-rc.6.schema.json", "schemas/tasknotes.task.binding/0.3.0-rc.6.schema.json",
+			"contracts/tasknotes.task/0.3.0-rc.7.md", "types/tasknotes-task/8.md",
+			"schemas/tasknotes.task/0.3.0-rc.7.schema.json", "schemas/tasknotes.task.binding/0.3.0-rc.7.schema.json",
 		].includes(source)).map(({ kind, mode, target }) => [kind, mode, target]),
 		[
-			["contract", "managed", "_mdbase/contracts/tasknotes.task/0.3.0-rc.6.md"],
+			["contract", "managed", "_mdbase/contracts/tasknotes.task/0.3.0-rc.7.md"],
 			["type", "seed", "_mdbase/types/action.md"],
 			["schema", "managed", "_mdbase/_schemas/tasknotes/tasknotes-task.schema.json"],
 			[

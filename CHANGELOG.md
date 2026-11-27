@@ -5,7 +5,8 @@
 ### Fixed
 
 - `planCalendarEdit` no longer clears other occurrences' completed or skipped history when moving a scheduled-anchored recurring task. Moves without a `recurrence_original_date` (such as Google-synced or legacy off-pattern tasks) clear only the landing day when it is already recorded; completion-anchored tasks keep clearing recorded instances on or after the new date. Thanks to @martin-forge for reporting (TaskNotes #2691).
-- Generated mdbase task types accept floating scheduled and due times written by TaskNotes. Thanks to @iantierney for reporting (TaskNotes #2706).
+- Generated mdbase task types and the `tasknotes.task` 0.3.0-rc.7 contract accept floating `due`, `scheduled`, `dateCreated`, and `dateModified` values through the `local-date-time` format. Pack 0.3.0-rc.23 upgrades all earlier starters, including the TaskNotes #2706 fix.
+- Calendar conversion accepts fractional seconds of any length and truncates to millisecond precision. Timestamp validation, task updates, and time tracking calculations use the collection timezone when callers supply it.
 
 ## 0.3.2 - 2026-11-20
 

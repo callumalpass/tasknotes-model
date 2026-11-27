@@ -182,21 +182,22 @@ export interface TaskNotesMdbaseTypePack {
  * type's version, so types written by TaskNotes and by the tasknotes.task pack
  * agree and pack upgrades do not see a conflicting version change.
  */
-export const TASKNOTES_MDBASE_TYPE_VERSION = 5;
+export const TASKNOTES_MDBASE_TYPE_VERSION = 6;
 
 /** Version of the generated definition bundle, independent of contract version. */
-export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.22";
+export const TASKNOTES_MDBASE_PACK_VERSION = "0.3.0-rc.23";
 export const TASKNOTES_CONTRACT_DIGEST =
-	"sha256:c400ead6e218b715d86ad31125bb3d4b2e276817da6ba8065449fd0947b24d67";
+	"sha256:1a0b33928c1e35399b0cffe808047cdca42a0881da27570a10fa6ead51dc51b2";
 
 /**
  * Earlier tasknotes.task versions whose types TaskNotes still reads. Their
  * bindings may hold settings rc.6 moved to the settings record; those are
  * read as the fallback after the record.
  */
-export const TASKNOTES_LEGACY_CONTRACT_VERSIONS = ["0.3.0-rc.5", "0.3.0-rc.3"] as const;
+export const TASKNOTES_LEGACY_CONTRACT_VERSIONS = ["0.3.0-rc.6", "0.3.0-rc.5", "0.3.0-rc.3"] as const;
 /** Semantic digests of the published legacy contracts, by version. */
 export const TASKNOTES_LEGACY_CONTRACT_DIGESTS: Readonly<Record<string, string>> = {
+	"0.3.0-rc.6": "sha256:c400ead6e218b715d86ad31125bb3d4b2e276817da6ba8065449fd0947b24d67",
 	"0.3.0-rc.5": "sha256:dde71d0d776aa0069ee627fe3c10b1a20f87ba36929a16790598ebfb4e8ebf04",
 };
 /** Contract versions a TaskNotes type may implement, newest first. */
@@ -695,11 +696,11 @@ export function buildTaskNotesMdbaseResources(
 		integerSchema({ minimum: 0 }, legacyCompatibility)
 	);
 	addField("completedDate", mapping.completedDate, dateSchema(legacyCompatibility));
-	addField("dateCreated", mapping.dateCreated, dateTimeSchema(legacyCompatibility), {
+	addField("dateCreated", mapping.dateCreated, taskTimestampSchema(legacyCompatibility), {
 		required: true,
 		createValue: { now: true },
 	});
-	addField("dateModified", mapping.dateModified, dateTimeSchema(legacyCompatibility), {
+	addField("dateModified", mapping.dateModified, taskTimestampSchema(legacyCompatibility), {
 		createValue: { now: true },
 		updateValue: { now: true },
 	});
@@ -995,8 +996,7 @@ export function buildTaskNotesMdbaseResources(
 		bindingSchemaDocument,
 		paths: {
 			config: "mdbase.yaml",
-			// Versioned, so the rc.5 contract at tasknotes.task.md stays for
-			// types that still implement it.
+			// Versioned, so existing contracts stay available to types that implement them.
 			contract: `${contractsFolder}/tasknotes.task/${TASKNOTES_SPEC_VERSION}.md`,
 			type: `${typesFolder}/${typeName}.md`,
 			taskSchema: `${schemasFolder}/tasknotes-task.schema.json`,
@@ -1039,7 +1039,7 @@ export async function buildTaskNotesMdbaseTypePack(
 		[`contracts/tasknotes.task/${TASKNOTES_SPEC_VERSION}.md`, {
 			target: resources.paths.contract, document: resources.contractDocument,
 		}],
-		["types/tasknotes-task/7.md", {
+		["types/tasknotes-task/8.md", {
 			target: resources.paths.type, document: resources.typeDocument,
 		}],
 		[`schemas/tasknotes.task/${TASKNOTES_SPEC_VERSION}.schema.json`, {
@@ -1741,13 +1741,16 @@ function taskDateSchema(legacyCompatibility: boolean): Record<string, unknown> {
 		anyOf: [
 			dateSchema(legacyCompatibility),
 			dateTimeSchema(legacyCompatibility),
-			{
-				type: "string",
-				// TaskNotes also stores wall-clock times without a UTC offset.
-				pattern: "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$",
-			},
+			{ type: "string", format: "local-date-time" },
 		],
 	};
+}
+
+function taskTimestampSchema(legacyCompatibility: boolean): Record<string, unknown> {
+	const instant = dateTimeSchema(legacyCompatibility);
+	return legacyCompatibility
+		? instant
+		: { anyOf: [instant, { type: "string", format: "local-date-time" }] };
 }
 
 function dateTimeSchema(legacyCompatibility: boolean): Record<string, unknown> {

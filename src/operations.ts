@@ -1,4 +1,5 @@
 import { formatDateForStorage, getDatePart, parseDateToUTC, validateDateString } from "./date";
+import { timestampForComparison } from "./calendar-date";
 import { isCompletedStatus } from "./config";
 import {
 	addDTSTARTToRecurrenceRule,
@@ -49,6 +50,8 @@ export interface BuildTaskUpdatePlanInput {
 	userFields?: readonly UserMappedField[];
 	statuses?: readonly StatusConfig[];
 	now?: string;
+	/** Collection timezone for reading floating created and modified timestamps. */
+	timezone?: string;
 	currentDateString?: string;
 	maintainDueDateOffsetInRecurring?: boolean;
 }
@@ -212,6 +215,7 @@ export function buildTaskUpdatePlan({
 	userFields = [],
 	statuses = [],
 	now = new Date().toISOString(),
+	timezone,
 	currentDateString = formatDateForStorage(parseDateToUTC(getDatePart(now))),
 	maintainDueDateOffsetInRecurring = true,
 }: BuildTaskUpdatePlanInput): TaskOperationPlan<TaskInfo> {
@@ -219,7 +223,8 @@ export function buildTaskUpdatePlan({
 	const dateModified = nextModifiedTimestamp(
 		now,
 		originalTask.dateCreated,
-		originalTask.dateModified
+		originalTask.dateModified,
+		timezone
 	);
 	const recurrenceUpdates = buildTaskUpdateRecurrenceUpdates({
 		originalTask,
@@ -263,12 +268,13 @@ export function buildTaskUpdatePlan({
 function nextModifiedTimestamp(
 	candidate: string,
 	dateCreated?: string,
-	previousModified?: string
+	previousModified?: string,
+	timezone?: string
 ): string {
-	const candidateTime = Date.parse(candidate);
+	const candidateTime = timestampForComparison(candidate, timezone);
 	if (!Number.isFinite(candidateTime)) return candidate;
 	const storedTimes = [dateCreated, previousModified]
-		.map((value) => (value ? Date.parse(value) : Number.NaN))
+		.map((value) => (value ? timestampForComparison(value, timezone) : Number.NaN))
 		.filter((value) => Number.isFinite(value));
 	if (storedTimes.length === 0) return candidate;
 	const floor = Math.max(...storedTimes);

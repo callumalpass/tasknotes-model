@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	DEFAULT_FIELD_MAPPING,
+	DEFAULT_STATUSES,
 	buildMaterializeOccurrencePlan,
 	buildMaterializedOccurrenceCompletePlan,
 	buildMaterializedOccurrenceUncompletePlan,
@@ -15,6 +16,7 @@ import {
 	canonicalAttachmentReference,
 	calculateTotalTrackedMinutes,
 	executeConformanceOperation,
+	evaluateCoreValidation,
 	formatDateForStorage,
 	getDatePart,
 	mapTaskFromFrontmatter,
@@ -23,9 +25,11 @@ import {
 	parseDateToUTC,
 	parseTaskDocument,
 	recalculateRecurringSchedule,
+	resolveDateTimeRangeBound,
 	serializeTaskDocument,
 	validateAttachmentReferences,
 	validateTask,
+	validateTimeEntries,
 } from "../dist/esm/index.js";
 
 test("maps TaskNotes frontmatter to normalized task data", () => {
@@ -157,6 +161,48 @@ test("parses dates with UTC storage semantics", () => {
 	assert.equal(formatDateForStorage(parseDateToUTC("2026-02-28")), "2026-02-28");
 	assert.equal(getDatePart("2026-02-28T10:30:00"), "2026-02-28");
 	assert.throws(() => parseDateToUTC("2026-02-30"), /Invalid date/);
+});
+
+test("parses floating minutes and fractional seconds without relaxing offset syntax", () => {
+	assert.equal(parseDateToUTC("2026-11-01T01:30", "America/New_York").toISOString(), "2026-11-01T05:30:00.000Z");
+	assert.equal(parseDateToUTC("2026-11-01T01:30:00.123987Z").toISOString(), "2026-11-01T01:30:00.123Z");
+	assert.equal(resolveDateTimeRangeBound("2026-11-01 01:30:00.123987Z", "from").toISOString(), "2026-11-01T01:30:00.123Z");
+	assert.throws(() => parseDateToUTC("2026-11-01T01:30Z"), /Invalid date/);
+	assert.throws(() => parseDateToUTC("2026-11-01T24:00"), /Invalid date/);
+});
+
+test("orders floating timestamps in the supplied collection timezone", () => {
+	const task = {
+		title: "Mixed timestamps",
+		status: "open",
+		priority: "normal",
+		path: "Tasks/mixed.md",
+		archived: false,
+		dateCreated: "2026-11-01T01:30:00.123987",
+		dateModified: "2026-11-01T05:45:00Z",
+	};
+	const timezone = "America/New_York";
+	assert.equal(evaluateCoreValidation(task, DEFAULT_STATUSES, timezone).valid, true);
+	assert.deepEqual(
+		evaluateCoreValidation(task, DEFAULT_STATUSES, "America/Los_Angeles").issues.map(({ code }) => code),
+		["date_modified_before_created"],
+	);
+
+	const entries = [{ startTime: task.dateCreated, endTime: task.dateModified }];
+	assert.equal(validateTimeEntries(entries, timezone).valid, true);
+	assert.equal(validateTimeEntries(entries, "America/Los_Angeles").valid, false);
+	assert.equal(calculateTotalTrackedMinutes(entries, timezone), 15);
+	assert.equal(calculateTotalTrackedMinutes(entries, "America/Los_Angeles"), 0);
+
+	const plan = buildTaskUpdatePlan({
+		originalTask: task,
+		updates: { title: "Edited" },
+		fieldMapping: DEFAULT_FIELD_MAPPING,
+		now: "2026-11-01T05:40:00Z",
+		timezone: "America/Los_Angeles",
+	});
+	assert.equal(plan.updatedTask.dateCreated, task.dateCreated);
+	assert.equal(plan.dateModified, "2026-11-01T08:30:00.124Z");
 });
 
 test("keeps modification timestamps valid when a device clock moves backwards", () => {

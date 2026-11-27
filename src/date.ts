@@ -1,12 +1,15 @@
+import { calendarDateToInstant } from "./calendar-date";
+
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const STRICT_DATETIME_RE =
-	/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,3})?(?:Z|([+-])(\d{2}):(\d{2}))?$/;
+	/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(\.\d+)?)?(Z|([+-])(\d{2}):(\d{2}))?$/;
 const RELAXED_DATETIME_RE =
-	/^(\d{4})-(\d{2})-(\d{2})(?:T| )(\d{2}):(\d{2})(?::(\d{2})(\.\d{1,3})?)?(Z|([+-])(\d{2}):(\d{2}))?$/;
+	/^(\d{4})-(\d{2})-(\d{2})(?:T| )(\d{2}):(\d{2})(?::(\d{2})(\.\d+)?)?(Z|([+-])(\d{2}):(\d{2}))?$/;
 
 export type DateTimeRangeBound = "from" | "to";
 
-export function parseDateToUTC(dateString: string): Date {
+/** Date-only values use a UTC anchor. Floating date-times use the supplied zone or the system zone. */
+export function parseDateToUTC(dateString: string, timezone?: string): Date {
 	const trimmed = requireDateString(dateString);
 	const dateOnlyMatch = trimmed.match(DATE_ONLY_RE);
 	if (dateOnlyMatch) {
@@ -20,15 +23,7 @@ export function parseDateToUTC(dateString: string): Date {
 		return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
 	}
 
-	if (!isStrictDateTime(trimmed)) {
-		throw new Error(`Invalid date "${dateString}".`);
-	}
-
-	const parsed = new Date(trimmed);
-	if (!isValidDate(parsed)) {
-		throw new Error(`Invalid date "${dateString}".`);
-	}
-	return parsed;
+	return parseStrictDateTime(trimmed, dateString, timezone);
 }
 
 export function parseDateToLocal(dateString: string): Date {
@@ -51,15 +46,7 @@ export function parseDateToLocal(dateString: string): Date {
 		return parsed;
 	}
 
-	if (!isStrictDateTime(trimmed)) {
-		throw new Error(`Invalid date "${dateString}".`);
-	}
-
-	const parsed = new Date(trimmed);
-	if (!isValidDate(parsed)) {
-		throw new Error(`Invalid date "${dateString}".`);
-	}
-	return parsed;
+	return parseStrictDateTime(trimmed, dateString);
 }
 
 export function formatDateForStorage(date: Date): string {
@@ -227,7 +214,7 @@ export function resolveDateTimeRangeBound(value: string, bound: DateTimeRangeBou
 	const hh = Number(hours);
 	const mm = Number(minutes);
 	const ss = seconds === undefined ? (bound === "to" ? 59 : 0) : Number(seconds);
-	const ms = fraction ? Number(fraction.slice(1).padEnd(3, "0")) : bound === "to" ? 999 : 0;
+	const ms = fraction ? Number(fraction.slice(1, 4).padEnd(3, "0")) : bound === "to" ? 999 : 0;
 
 	if (
 		!isValidCalendarDate(y, m, d) ||
@@ -266,16 +253,28 @@ function requireDateString(value: string, message = "Date string cannot be empty
 	return value.trim();
 }
 
-function isStrictDateTime(value: string): boolean {
+function parseStrictDateTime(value: string, original: string, timezone?: string): Date {
 	const match = value.match(STRICT_DATETIME_RE);
-	if (!match) return false;
+	if (!match) throw new Error(`Invalid date "${original}".`);
 
-	const [, year, month, day, hours, minutes, seconds, , tzSign, tzHours, tzMinutes] = match;
-	return (
-		isValidCalendarDate(Number(year), Number(month), Number(day)) &&
-		isValidClockTime(Number(hours), Number(minutes), Number(seconds)) &&
-		isValidOffset(tzSign, tzHours, tzMinutes)
-	);
+	const [, year, month, day, hours, minutes, seconds, fraction, offset, tzSign, tzHours, tzMinutes] = match;
+	if (
+		(offset && seconds === undefined) ||
+		!isValidCalendarDate(Number(year), Number(month), Number(day)) ||
+		!isValidClockTime(Number(hours), Number(minutes), Number(seconds ?? "0")) ||
+		!isValidOffset(tzSign, tzHours, tzMinutes)
+	) {
+		throw new Error(`Invalid date "${original}".`);
+	}
+
+	if (timezone !== undefined && !offset) {
+		return new Date(calendarDateToInstant(value, timezone));
+	}
+	const normalized = `${year}-${month}-${day}T${hours}:${minutes}:${seconds ?? "00"}` +
+		`${fraction?.slice(0, 4).padEnd(4, "0") ?? ".000"}${offset ?? ""}`;
+	const parsed = new Date(normalized);
+	if (!isValidDate(parsed)) throw new Error(`Invalid date "${original}".`);
+	return parsed;
 }
 
 function isValidCalendarDate(year: number, month: number, day: number): boolean {
