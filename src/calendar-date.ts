@@ -1,6 +1,6 @@
 // Calendar dates are civil values in an explicit IANA zone, never the process zone.
 const DAY = 86_400_000;
-const CIVIL = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/;
+const CIVIL = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?$/;
 
 export function calendarDay(value: string): string {
 	return value.slice(0, 10);
@@ -65,6 +65,15 @@ export function calendarDateToInstant(value: string, timezone: string): number {
 	return cached !== undefined ? cached : remember(toInstant, key, dateToInstant(value, timezone));
 }
 
+export function timestampForComparison(value: string, timezone?: string): number {
+	if (timezone === undefined) return Date.parse(value);
+	try {
+		return calendarDateToInstant(value.trim(), timezone);
+	} catch {
+		return NaN;
+	}
+}
+
 function dateToInstant(value: string, timezone: string): number {
 	const match = CIVIL.exec(value);
 	if (!match) {
@@ -89,7 +98,7 @@ function dateToInstant(value: string, timezone: string): number {
 	const matching = candidates.filter((ms) => civilAt(ms, format) === civil);
 	return (
 		(matching.length ? Math.min(...matching) : Math.max(...candidates)) +
-		Number(fraction.padEnd(3, "0"))
+		Number(fraction.slice(0, 3).padEnd(3, "0"))
 	);
 }
 

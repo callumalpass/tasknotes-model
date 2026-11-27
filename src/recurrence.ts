@@ -453,7 +453,6 @@ function getLookAheadDays(recurrence: string): number {
 
 function formatDtstartValue(dateStr: string): string {
 	if (hasTimeComponent(dateStr)) {
-		// Task dates are often minute precision ("2026-06-04T10:30"), which the strict parser rejects.
 		const dateTime = resolveDateTimeRangeBound(dateStr, "from");
 		const year = dateTime.getFullYear();
 		const month = String(dateTime.getMonth() + 1).padStart(2, "0");

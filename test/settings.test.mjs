@@ -111,7 +111,7 @@ test("upgrades an rc.5 type by moving its settings out of the binding", () => {
 	const { type: upgraded, appSettings, upgraded: changed } = upgradeTaskNotesMdbaseTypeContract(type);
 	const binding = upgraded.implements[0].binding;
 	assert.equal(changed, true);
-	assert.equal(upgraded.implements[0].version, "0.3.0-rc.6");
+	assert.equal(upgraded.implements[0].version, "0.3.0-rc.7");
 	assert.equal(binding.templating, undefined);
 	assert.equal(binding.time_tracking, undefined);
 	assert.equal(binding.nlp, undefined);

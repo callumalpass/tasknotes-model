@@ -222,7 +222,7 @@ export function executeConformanceOperation(
 			case "validation.core_evaluate":
 				return ok(validateCoreConformance(input));
 			case "validation.time_entries":
-				return ok(validateTimeEntries(input.entries));
+				return ok(validateTimeEntries(input.entries, stringOrUndefined(input.timezone)));
 			case "op.mutate_with_validation":
 				return mutateWithValidation(input);
 			case "op.update_patch":
@@ -289,7 +289,9 @@ export function executeConformanceOperation(
 			case "time.auto_stop_on_complete":
 				return ok({ value: true });
 			case "time.report_totals":
-				return ok({ minutes: calculateTotalTrackedMinutes(arrayValue(input.entries) as TimeEntry[]) });
+				return ok({
+					minutes: calculateTotalTrackedMinutes(arrayValue(input.entries) as TimeEntry[], stringOrUndefined(input.timezone)),
+				});
 			default:
 				return err(`Unsupported operation: ${operation}`, { operation, code: "unsupported_operation" });
 		}
@@ -500,6 +502,7 @@ function addConformanceIssue(
 function validateCoreConformance(input: Record<string, unknown>): Record<string, unknown> {
 	const fields = asRecord(input.fields);
 	const frontmatter = asRecord(input.frontmatter);
+	const timezone = stringOrUndefined(input.timezone);
 	const mapping = buildSpecFieldMapping(fields, stringOrUndefined(input.displayNameKey));
 	const normalized = normalizeSpecFrontmatter(frontmatter, mapping);
 	const issues: Record<string, unknown>[] = [];
@@ -542,7 +545,9 @@ function validateCoreConformance(input: Record<string, unknown>): Record<string,
 	}
 	if (typeof normalized.dateCreated === "string" && typeof normalized.dateModified === "string") {
 		try {
-			if (parseDateToUTC(normalized.dateModified).getTime() < parseDateToUTC(normalized.dateCreated).getTime()) {
+			const created = parseDateToUTC(normalized.dateCreated, timezone).getTime();
+			const modified = parseDateToUTC(normalized.dateModified, timezone).getTime();
+			if (modified < created) {
 				addConformanceIssue(issues, "date_modified_before_created", "error", mapping.roleToField.dateModified);
 			}
 		} catch {

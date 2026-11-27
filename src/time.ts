@@ -1,3 +1,4 @@
+import { timestampForComparison } from "./calendar-date";
 import type { TaskInfo, TimeEntry } from "./types";
 
 export interface StartTimeTrackingPlan {
@@ -32,30 +33,26 @@ export function getActiveTimeEntry(task: Pick<TaskInfo, "timeEntries">): TimeEnt
 	return sanitizeTimeEntries(task.timeEntries).find((entry) => !entry.endTime);
 }
 
-export function calculateTimeEntryMinutes(entry: TimeEntry): number {
+export function calculateTimeEntryMinutes(entry: TimeEntry, timezone?: string): number {
 	if (!entry.endTime) return 0;
-	const start = new Date(entry.startTime);
-	const end = new Date(entry.endTime);
-	if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-		return 0;
-	}
-	return Math.round((end.getTime() - start.getTime()) / 60000);
+	return calculateElapsedTimeEntryMinutes(entry, entry.endTime, timezone);
 }
 
 export function calculateElapsedTimeEntryMinutes(
 	entry: TimeEntry,
-	now = new Date().toISOString()
+	now = new Date().toISOString(),
+	timezone?: string
 ): number {
-	const start = new Date(entry.startTime);
-	const end = new Date(entry.endTime || now);
-	if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+	const start = timestampForComparison(entry.startTime, timezone);
+	const end = timestampForComparison(entry.endTime || now, timezone);
+	if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
 		return 0;
 	}
-	return Math.round((end.getTime() - start.getTime()) / 60000);
+	return Math.round((end - start) / 60000);
 }
 
-export function calculateTotalTrackedMinutes(entries: readonly TimeEntry[] | undefined): number {
-	return sanitizeTimeEntries(entries).reduce((total, entry) => total + calculateTimeEntryMinutes(entry), 0);
+export function calculateTotalTrackedMinutes(entries: readonly TimeEntry[] | undefined, timezone?: string): number {
+	return sanitizeTimeEntries(entries).reduce((total, entry) => total + calculateTimeEntryMinutes(entry, timezone), 0);
 }
 
 export function buildStartTimeTrackingPlan(

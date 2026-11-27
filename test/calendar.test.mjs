@@ -178,6 +178,10 @@ test("civil DST disambiguation and offset instants have explicit compatible sema
 		"2026-11-01T05:30:00.000Z",
 	);
 	assert.equal(
+		new Date(calendarDateToInstant("2026-11-01T01:30:00.123987", "America/New_York")).toISOString(),
+		"2026-11-01T05:30:00.123Z",
+	);
+	assert.equal(
 		calendarInstantToDate(
 			calendarDateToInstant("2026-03-08T15:30:00+13:00", "UTC"),
 			"Pacific/Auckland",

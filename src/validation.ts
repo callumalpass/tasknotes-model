@@ -1,4 +1,5 @@
 import { getDatePart, validateDateString } from "./date";
+import { timestampForComparison } from "./calendar-date";
 import { validateAttachmentReferences } from "./attachments";
 import { isCompletedStatus } from "./config";
 import { taskInfoSchema, timeEntrySchema } from "./schema";
@@ -10,7 +11,7 @@ import type {
 	TimeEntry,
 } from "./types";
 
-export function validateTask(task: Partial<TaskInfo>): TaskValidationResult {
+export function validateTask(task: Partial<TaskInfo>, timezone?: string): TaskValidationResult {
 	const issues: TaskValidationIssue[] = [];
 	const parsed = taskInfoSchema.partial().safeParse(task);
 	if (!parsed.success) {
@@ -71,7 +72,7 @@ export function validateTask(task: Partial<TaskInfo>): TaskValidationResult {
 	}
 
 	if (task.timeEntries) {
-		issues.push(...validateTimeEntries(task.timeEntries).issues);
+		issues.push(...validateTimeEntries(task.timeEntries, timezone).issues);
 	}
 
 	for (const issue of validateAttachmentReferences(task.attachments, task.path).issues) {
@@ -90,7 +91,8 @@ export function validateTask(task: Partial<TaskInfo>): TaskValidationResult {
 	};
 }
 
-export function validateTimeEntries(entries: unknown): TaskValidationResult {
+/** Floating timestamps use the collection timezone when supplied, otherwise the system zone. */
+export function validateTimeEntries(entries: unknown, timezone?: string): TaskValidationResult {
 	const issues: TaskValidationIssue[] = [];
 	if (!Array.isArray(entries)) {
 		return {
@@ -119,7 +121,7 @@ export function validateTimeEntries(entries: unknown): TaskValidationResult {
 			}
 			return;
 		}
-		validateTimeEntryOrder(parsed.data, index, issues);
+		validateTimeEntryOrder(parsed.data, index, issues, timezone);
 	});
 
 	const activeCount = (entries as TimeEntry[]).filter((entry) => entry && !entry.endTime).length;
@@ -138,11 +140,13 @@ export function validateTimeEntries(entries: unknown): TaskValidationResult {
 	};
 }
 
+/** Floating timestamps use the collection timezone when supplied, otherwise the system zone. */
 export function evaluateCoreValidation(
 	task: Partial<TaskInfo>,
-	statuses: readonly StatusConfig[]
+	statuses: readonly StatusConfig[],
+	timezone?: string
 ): TaskValidationResult {
-	const result = validateTask(task);
+	const result = validateTask(task, timezone);
 	for (const field of ["title", "status", "dateCreated", "dateModified"] as const) {
 		const value = task[field];
 		if (typeof value !== "string" || value.trim().length === 0) {
@@ -188,8 +192,8 @@ export function evaluateCoreValidation(
 	}
 
 	if (task.dateCreated && task.dateModified) {
-		const created = Date.parse(task.dateCreated);
-		const modified = Date.parse(task.dateModified);
+		const created = timestampForComparison(task.dateCreated, timezone);
+		const modified = timestampForComparison(task.dateModified, timezone);
 		if (Number.isFinite(created) && Number.isFinite(modified) && modified < created) {
 			result.issues.push({
 				code: "date_modified_before_created",
@@ -216,10 +220,11 @@ export function evaluateCoreValidation(
 function validateTimeEntryOrder(
 	entry: TimeEntry,
 	index: number,
-	issues: TaskValidationIssue[]
+	issues: TaskValidationIssue[],
+	timezone?: string
 ): void {
-	const start = new Date(entry.startTime);
-	if (Number.isNaN(start.getTime())) {
+	const start = timestampForComparison(entry.startTime, timezone);
+	if (!Number.isFinite(start)) {
 		issues.push({
 			code: "invalid_time_entry_start",
 			message: "Time entry startTime must be a valid datetime",
@@ -233,8 +238,8 @@ function validateTimeEntryOrder(
 		return;
 	}
 
-	const end = new Date(entry.endTime);
-	if (Number.isNaN(end.getTime())) {
+	const end = timestampForComparison(entry.endTime, timezone);
+	if (!Number.isFinite(end)) {
 		issues.push({
 			code: "invalid_time_entry_end",
 			message: "Time entry endTime must be a valid datetime",
